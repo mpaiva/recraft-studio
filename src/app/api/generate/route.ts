@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const brief: string = (body?.brief ?? '').trim()
     const salt: string = (body?.salt ?? '').trim()
+    const industry: string = (body?.industry ?? '').trim()
 
     const subjects: string[] = Array.isArray(body?.subjects)
       ? body.subjects.map((s: unknown) => String(s).trim()).filter(Boolean)
@@ -80,7 +81,10 @@ export async function POST(request: Request) {
     for (const subject of work) {
       // Prefix the shared brief when the subjects are individual lines, so every
       // image in the set still carries the same direction.
-      const prompt = subjects.length && brief ? `${brief} ${subject}` : subject
+      // The industry goes last, as context rather than as the subject: it should
+      // steer the props and setting without taking over what is being drawn.
+      const scene = subjects.length && brief ? `${brief} ${subject}` : subject
+      const prompt = industry ? `${scene}. Industry: ${industry}.` : scene
 
       try {
         const { data, ext } = await generate(prompt, palette.colors)

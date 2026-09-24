@@ -28,6 +28,7 @@ function slug(subject: string, index: number) {
 
 export function Studio() {
   const [brief, setBrief] = useState('')
+  const [industry, setIndustry] = useState('')
   const [lines, setLines] = useState('')
   const [count, setCount] = useState(3)
   const [salt, setSalt] = useState('')
@@ -37,6 +38,8 @@ export function Studio() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
+  const [improving, setImproving] = useState(false)
+  const [improveError, setImproveError] = useState('')
 
   // Ask what the account can spend before anything is committed to. Free, and
   // the alternative is finding out from a 400 partway through a batch.
@@ -60,7 +63,7 @@ export function Studio() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, subjects, count, salt }),
+        body: JSON.stringify({ brief, industry, subjects, count, salt }),
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? `Request failed: ${res.status}`)
@@ -73,6 +76,27 @@ export function Studio() {
       setError(String(e))
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Rewrites the subjects in place rather than drawing them, so the result is
+  // read and edited before any Recraft units are spent on it.
+  async function improve() {
+    setImproving(true)
+    setImproveError('')
+    try {
+      const res = await fetch('/api/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief, industry, subjects, count }),
+      })
+      const data = await res.json()
+      if (!res.ok) setImproveError(data.error ?? `Request failed: ${res.status}`)
+      else setLines(data.subjects.join('\n'))
+    } catch (e) {
+      setImproveError(String(e))
+    } finally {
+      setImproving(false)
     }
   }
 
@@ -122,6 +146,19 @@ export function Studio() {
 
         <div style={{ height: 14 }} />
 
+        <label htmlFor="industry">
+          Industry <span className="hint">— optional context for the setting and props</span>
+        </label>
+        <input
+          id="industry"
+          type="text"
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          placeholder="Healthcare, logistics, fintech…"
+        />
+
+        <div style={{ height: 14 }} />
+
         <label htmlFor="lines">
           Subjects <span className="hint">— one per line, or leave empty for variations on the brief</span>
         </label>
@@ -132,6 +169,17 @@ export function Studio() {
           onChange={(e) => setLines(e.target.value)}
           placeholder={'a stand-up call across four time zones\na pull request waiting overnight\nan onboarding checklist'}
         />
+
+        <div style={{ height: 8 }} />
+
+        <button className="ghost" onClick={improve} disabled={improving || busy || (!industry && !brief)}>
+          {improving
+            ? 'Improving…'
+            : subjects.length
+              ? `Improve ${subjects.length === 1 ? 'subject' : 'subjects'} for ${industry || 'the brief'}`
+              : `Suggest ${count} subjects for ${industry || 'the brief'}`}
+        </button>{' '}
+        {improveError ? <span className="error hint">{improveError}</span> : null}
 
         <div style={{ height: 14 }} />
 

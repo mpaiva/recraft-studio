@@ -12,6 +12,8 @@ arbitrary input, at request time, in the browser.
 ## What it does
 
 - A **brief** sets the direction the whole set shares.
+- An optional **industry** is added to every prompt as context for the setting
+  and props.
 - **Subjects**, one per line, become one illustration each — or leave them empty
   and get variations on the brief.
 - One **palette** is derived from the brief and shared across the set, so the
@@ -31,6 +33,10 @@ npm run dev
 `RECRAFT_API_TOKEN` is required. `RECRAFT_STYLE_ID` is optional but strongly
 recommended — without it the app falls back to a built-in substyle, which is a
 floor rather than a substitute. The UI says which one is in use.
+
+`ANTHROPIC_API_KEY` is needed only for the **Improve subjects** button, which
+asks Claude to rewrite the subject lines for the chosen industry. Drawing works
+without it.
 
 To train a style on reference images, see
 [docs/RECRAFT-API.md](docs/RECRAFT-API.md#styles-trained--substyle--nothing).
@@ -55,8 +61,10 @@ src/lib/recraft/svg.ts      normalise + optimise the SVG that comes back
 src/lib/recraft/cost.ts     units per image, and the measurement behind it
 src/lib/recraft/prompt.ts   the preamble, clause by clause
 src/lib/palette.ts          three colours from a seed, as wheel geometry
+src/lib/improve.ts          rewrite subjects for an industry, via Claude
 src/app/api/balance         what the account can spend
 src/app/api/generate        draw a set
+src/app/api/improve         rewrite the subjects (Claude, no Recraft units)
 src/app/Studio.tsx          the UI
 ```
 
@@ -72,5 +80,5 @@ src/app/Studio.tsx          the UI
 ## Status
 
 Early. It generates and downloads sets; it does not persist them, and there is
-no auth on the generate route. Read the last section of `DECISIONS.md` before
+no auth on the generate or improve routes. Read the last section of `DECISIONS.md` before
 adding either — the rules about replacing files were paid for once already.
