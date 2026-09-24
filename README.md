@@ -86,13 +86,14 @@ src/lib/recraft/prompt.ts   the preamble, clause by clause
 src/lib/palette.ts          three colors from a seed, as wheel geometry
 src/lib/improve.ts          rewrite subjects for an industry, via Claude
 src/app/api/balance         what the account can spend
-src/app/api/generate        draw a set
+src/app/api/generate        draw a set, streamed as each image finishes
 src/app/api/improve         rewrite the subjects (Claude, no Recraft units)
 src/app/api/styles          every style the form can pick
 src/app/StylePicker.tsx     the style browser
 src/app/CreateStyle.tsx     describe a style, check its references, make it
 scripts/samples.ts          draw one sample per style, for the browser
-src/app/Studio.tsx          the UI
+src/app/Studio.tsx          the column of decisions, and the draw loop
+src/app/Stage.tsx           where sets land, one drawing at a time
 ```
 
 ## Docs
