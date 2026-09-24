@@ -12,6 +12,8 @@ arbitrary input, at request time, in the browser.
 ## What it does
 
 - A **brief** sets the direction the whole set shares.
+- A **style** is picked from a browser of every style available: Recraft's
+  curated vector library and the account's own, each with a sample drawing.
 - An optional **industry** is added to every prompt as context for the setting
   and props.
 - **Subjects**, one per line, become one illustration each — or leave them empty
@@ -34,13 +36,24 @@ cp .env.local.example .env.local   # then add your token
 npm run dev
 ```
 
-`RECRAFT_API_TOKEN` is required. `RECRAFT_STYLE_ID` is optional but strongly
-recommended — without it the app falls back to a built-in substyle, which is a
-floor rather than a substitute. The UI says which one is in use.
+`RECRAFT_API_TOKEN` is required. `RECRAFT_STYLE_ID` is optional: it sets the
+style the form starts on. Without it the form starts on the curated "Colored
+stencil" style, and any style can be picked in the form either way.
 
 `ANTHROPIC_API_KEY` is needed only for the **Improve subjects** button, which
 asks Claude to rewrite the subject lines for the chosen industry. Drawing works
 without it.
+
+The style browser's sample drawings live in `public/style-samples/` and are
+committed. To draw samples for styles that do not have one yet — a new style on
+the account, say:
+
+```bash
+npm run samples          # the plan and its cost; spends nothing
+npm run samples -- --yes # draw it
+```
+
+It never overwrites a sample. To redraw one, move its file out first.
 
 To train a style on reference images, see
 [docs/RECRAFT-API.md](docs/RECRAFT-API.md#styles-trained--substyle--nothing).
@@ -49,9 +62,9 @@ SVG to hand back.
 
 ## Cost
 
-Every image is real money. Vector generation is taken as **80 API units** each
-(see the doc for where that number comes from and how confident it is), so a set
-of four costs about 320. Sets are capped at six.
+Every image is real money, and the price depends on the style: **80 API units**
+for a curated style, **50** for one of the account's own (both measured — see
+the doc). A set of four costs 320 or 200. Sets are capped at six.
 
 The balance the app checks is Recraft's **prepaid API pool**, which is separate
 from the subscription credits the web editor spends. A paid-up plan can sit
@@ -62,13 +75,17 @@ beside a zero here.
 ```
 src/lib/recraft/client.ts   the API: balance, styles, generation
 src/lib/recraft/svg.ts      normalize + optimize the SVG that comes back
-src/lib/recraft/cost.ts     units per image, and the measurement behind it
+src/lib/recraft/cost.ts     units per image, per model, and the measurements
+src/lib/recraft/styles.ts   every style: its model, size, price and sample
 src/lib/recraft/prompt.ts   the preamble, clause by clause
 src/lib/palette.ts          three colors from a seed, as wheel geometry
 src/lib/improve.ts          rewrite subjects for an industry, via Claude
 src/app/api/balance         what the account can spend
 src/app/api/generate        draw a set
 src/app/api/improve         rewrite the subjects (Claude, no Recraft units)
+src/app/api/styles          every style the form can pick
+src/app/StylePicker.tsx     the style browser
+scripts/samples.ts          draw one sample per style, for the browser
 src/app/Studio.tsx          the UI
 ```
 

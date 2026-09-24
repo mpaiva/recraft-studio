@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { PREAMBLE, SIZE } from './prompt'
+import { PREAMBLE } from './prompt'
+import type { StyleOption } from './styles'
 
 /**
  * The Recraft API, and the four things about it that cost time to learn.
@@ -11,10 +12,10 @@ import { PREAMBLE, SIZE } from './prompt'
  * 400 on the first image. `balance()` exists so that shows up before a batch
  * rather than eight images into one.
  *
- * **2. A trained style is not the same as a substyle.** `style_id` points at a
- * style trained on reference images and is the difference between a set that
- * shares a look and a set that merely shares a substyle. Without one this falls
- * back to `colored_stencil`, which is a floor, not a substitute.
+ * **2. A style decides the model, the size and the price.** A curated style
+ * goes to Recraft V3; a style id now resolves to Recraft V4 Styles, which
+ * rejects V3's sizes. `styles.ts` holds that mapping, and `generate()` takes
+ * the resolved style rather than guessing.
  *
  * **3. Dropping the substyle entirely is worse than either.** Tried once: with
  * no style and no substyle the model returns a *photograph of an illustration
@@ -47,26 +48,14 @@ export async function balance(): Promise<number> {
   return Number(JSON.parse(await res.text())?.credits ?? 0)
 }
 
-/**
- * The style parameters for a generation.
- *
- * A style id is not a secret and it decides what everything looks like, so it
- * belongs somewhere visible. In the repo this came from it is committed to a
- * JSON file for exactly that reason: held in an ignored file it would be absent
- * on any other machine, and the fallback would quietly draw in a different
- * style rather than fail — the worst kind of difference, because nothing
- * reports it. Here it is an env var, so the fallback announces itself in the
- * response instead.
- */
-export function style(): { key: string; params: Record<string, string>; trained: boolean } {
-  const id = process.env.RECRAFT_STYLE_ID?.trim()
-  return id
-    ? { key: `style_id:${id}`, params: { style_id: id }, trained: true }
-    : {
-        key: 'substyle:colored_stencil',
-        params: { style: 'vector_illustration', substyle: 'colored_stencil' },
-        trained: false,
-      }
+/** A style on this account, as `GET /v1/styles` lists it. No name, no preview. */
+export type AccountStyle = { id: string; style: string; creation_time?: string; is_private?: boolean }
+
+/** The account's own styles. Free to ask. */
+export async function listStyles(): Promise<AccountStyle[]> {
+  const res = await fetch(`${API}/styles`, { headers: { Authorization: `Bearer ${token()}` } })
+  if (!res.ok) throw new Error(`Could not list Recraft styles: ${res.status}`)
+  return (JSON.parse(await res.text())?.styles ?? []) as AccountStyle[]
 }
 
 /**
@@ -106,14 +95,15 @@ export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' }
 export async function generate(
   subject: string,
   colors: [number, number, number][],
+  style: StyleOption,
 ): Promise<Generated> {
   const res = await fetch(`${API}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
     body: JSON.stringify({
       prompt: `${PREAMBLE} ${subject}`,
-      size: SIZE,
-      ...style().params,
+      size: style.size,
+      ...style.params,
       controls: { colors: colors.map((c) => ({ rgb: c })) },
     }),
   })

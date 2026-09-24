@@ -1,8 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { optimize } from 'svgo'
 
-import { SIZE } from './prompt'
-
 const SHAPES = 'path, rect, circle, ellipse, polygon, polyline'
 
 /**
@@ -53,13 +51,14 @@ export type Normalized = {
  * — and it is the price of letting the model choose how to use the three hues
  * it was given.
  */
-export function normalize(source: string): Normalized {
+/** `size` is what was asked for, `WIDTHxHEIGHT` — used only if the SVG has no viewBox. */
+export function normalize(source: string, size: string): Normalized {
   const dom = new JSDOM(source, { contentType: 'image/svg+xml' })
   const svg = dom.window.document.documentElement
 
   svg.querySelector('metadata')?.remove()
 
-  const viewBox = svg.getAttribute('viewBox') ?? `0 0 ${SIZE.replace('x', ' ')}`
+  const viewBox = svg.getAttribute('viewBox') ?? `0 0 ${size.replace('x', ' ')}`
   const [, , width, height] = viewBox.split(/\s+/).map(Number)
 
   svg.removeAttribute('width')

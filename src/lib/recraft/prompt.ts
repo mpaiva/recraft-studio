@@ -30,5 +30,3 @@ export const PREAMBLE =
   'No text, no lettering, no numbers. ' +
   'The artwork fills the whole frame edge to edge. No border, no frame, no vignette.'
 
-/** Recraft wants `WIDTHxHEIGHT`. 3:2 landscape. */
-export const SIZE = '1536x1024'

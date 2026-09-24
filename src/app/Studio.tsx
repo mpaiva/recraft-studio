@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import type { Item } from './api/generate/route'
 import { paletteFor, parseHex, SCHEMES, toHex } from '@/lib/palette'
+import { StylePicker, type StyleInfo } from './StylePicker'
 
-type Account = { credits: number; unitsPerImage: number; style: { trained: boolean; key: string } }
+type Account = { credits: number }
 type Result = {
   items: Item[]
   palette: { hex: string[]; scheme: { name: string; reason: string }; base: number }
-  style: { trained: boolean; key: string }
+  style: { key: string; name: string }
   spent: { images: number; units: number }
 }
 
@@ -39,6 +40,9 @@ export function Studio() {
   const [account, setAccount] = useState<Account | null>(null)
   const [accountError, setAccountError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [styles, setStyles] = useState<StyleInfo[]>([])
+  const [styleKey, setStyleKey] = useState('')
+  const [picking, setPicking] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [improving, setImproving] = useState(false)
@@ -51,11 +55,21 @@ export function Studio() {
       .then((r) => r.json())
       .then((d) => (d.error ? setAccountError(d.error) : setAccount(d)))
       .catch((e) => setAccountError(String(e)))
+    fetch('/api/styles')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) return
+        setStyles(d.styles)
+        setStyleKey((k) => k || d.defaultKey)
+      })
+      .catch(() => {})
   }, [])
 
   const subjects = lines.split('\n').map((s) => s.trim()).filter(Boolean)
   const images = Math.min(subjects.length || count, 6)
-  const needed = images * (account?.unitsPerImage ?? 80)
+  // The price is per style — curated and account styles use different models.
+  const style = styles.find((s) => s.key === styleKey)
+  const needed = images * (style?.units ?? 80)
   const affordable = account ? account.credits >= needed : true
 
   // The same call the server makes, with the same inputs trimmed the same way,
@@ -74,7 +88,7 @@ export function Studio() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, industry, subjects, count, salt, brand: brand.trim(), scheme }),
+        body: JSON.stringify({ brief, industry, subjects, count, salt, brand: brand.trim(), scheme, style: styleKey }),
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? `Request failed: ${res.status}`)
@@ -131,10 +145,9 @@ export function Studio() {
         ) : account ? (
           <div className="meta">
             <span>API credit <strong>{account.credits.toLocaleString()}</strong></span>
-            <span>Per image <strong>{account.unitsPerImage}</strong></span>
+            <span>Per image <strong>{style?.units ?? '…'}</strong></span>
             <span>
-              Style{' '}
-              <strong>{account.style.trained ? 'trained' : 'fallback (colored_stencil)'}</strong>
+              Style <strong>{style?.name ?? '…'}</strong>
             </span>
             <span>This run <strong className={affordable ? '' : 'error'}>{needed}</strong></span>
           </div>
@@ -208,6 +221,39 @@ export function Studio() {
             onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
           />
         </div>
+
+        <section className="group" aria-labelledby="style-label">
+          <label id="style-label">
+            Style <span className="hint">— how every image in the set is drawn</span>
+          </label>
+          <div className="style-current">
+            {style?.sample ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a local SVG; next/image adds nothing here
+              <img src={style.sample} alt="" />
+            ) : (
+              <span className="no-sample" />
+            )}
+            <span className="style-meta">
+              <strong>{style?.name ?? 'Loading styles…'}</strong>
+              {style ? (
+                <span className="hint">
+                  {style.kind === 'curated' ? 'Curated' : 'Yours'} · {style.units} units per image
+                </span>
+              ) : null}
+            </span>
+            <button className="ghost" onClick={() => setPicking(true)} disabled={!styles.length}>
+              Browse styles
+            </button>
+          </div>
+        </section>
+
+        <StylePicker
+          open={picking}
+          styles={styles}
+          selected={styleKey}
+          onPick={setStyleKey}
+          onClose={() => setPicking(false)}
+        />
 
         {/*
           Every color decision in one place, in the order they are made: pin it
@@ -313,7 +359,7 @@ export function Studio() {
 
         <div style={{ height: 18 }} />
 
-        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable || brandInvalid}>
+        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable || brandInvalid || !style}>
           {busy
             ? `Drawing ${images}…`
             : `Draw ${images} illustration${images === 1 ? '' : 's'} · ${needed} units`}

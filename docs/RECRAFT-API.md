@@ -22,8 +22,14 @@ batch, not after the first failure — the call is free.
 Measured, from a single 37-image run: balance 1115 before, 35 after, 27 images
 drawn. That is **40 units per raster image**.
 
-Vector output is double elsewhere in Recraft's pricing, so **80 units** is the
-figure used here — inferred, not measured. If you measure it, correct it.
+Vector was then taken as double that, 80, by analogy with Recraft's pricing —
+and nobody checked for a long time. Measured on 2026-09-24, one image each,
+balance read before and after:
+
+- `recraftv3_vector` (a curated style, or the old substyle): **80 units**
+- `recraftv4_styles_vector` (a style id from the account): **50 units**
+
+So the price is per model, and the model follows the style.
 
 This matters more than it looks. An earlier version of the preflight assumed 1
 and 2 units, told a 37-image run it needed 37 units against a balance of 1115,
@@ -52,6 +58,21 @@ it somewhere visible and shared — committed config, not an ignored `.env`. Hel
 in an ignored file it is absent on every other machine, and a fallback quietly
 draws in a different style rather than failing. That is the worst kind of
 difference, because nothing reports it.
+
+### A style id now means V4, and V4 has its own sizes
+
+`GET /styles` lists the account's styles — id, base family, creation time. No
+names and no preview images. There is no endpoint for Recraft's curated
+library; those names are in the docs and are sent as `style: 'Colored stencil'`
+with `model: 'recraftv3_vector'`.
+
+A `style_id` sent with no model now resolves to **Recraft V4 Styles**, which
+rejects V3's sizes: `1536x1024` comes back as a 400, *"Recraft V4 Styles doesn't
+support 1536x1024 image size"*. Send `model: 'recraftv4_styles_vector'` and
+its 3:2 size, `1280x832`. The listing does not say which model a style was made
+for, so this is the assumption, and it held for the one vector style tested.
+
+A rejected request costs nothing, so a 400 is a cheap way to learn a rule.
 
 ### Base family decides raster vs vector
 

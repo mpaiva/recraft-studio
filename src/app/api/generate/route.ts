@@ -1,5 +1,6 @@
-import { balance, generate, style } from '@/lib/recraft/client'
-import { estimate, UNITS_PER_IMAGE } from '@/lib/recraft/cost'
+import { balance, generate } from '@/lib/recraft/client'
+import { estimate } from '@/lib/recraft/cost'
+import { defaultKey, resolveStyle } from '@/lib/recraft/styles'
 import { normalize } from '@/lib/recraft/svg'
 import { paletteFor, parseHex, schemeById } from '@/lib/palette'
 
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
     const industry: string = (body?.industry ?? '').trim()
     const brand: string = (body?.brand ?? '').trim()
     const scheme: string = (body?.scheme ?? '').trim()
+    const styleKey: string = (body?.style ?? '').trim() || defaultKey()
 
     const subjects: string[] = Array.isArray(body?.subjects)
       ? body.subjects.map((s: unknown) => String(s).trim()).filter(Boolean)
@@ -59,6 +61,15 @@ export async function POST(request: Request) {
       return Response.json({ error: `Unknown color scheme "${scheme}".` }, { status: 400 })
     }
 
+    // The style decides the model, the size and the price, so it is resolved
+    // before the preflight — the estimate has to be for the style actually used.
+    let style
+    try {
+      style = await resolveStyle(styleKey)
+    } catch (error) {
+      return Response.json({ error: (error as Error).message }, { status: 400 })
+    }
+
     // No subjects means "variations on the brief": the same request N times,
     // which the model answers differently each time.
     const count = Math.min(subjects.length || Number(body?.count ?? 3), MAX_SET)
@@ -66,14 +77,14 @@ export async function POST(request: Request) {
 
     // Preflight. Free to ask, and the only thing standing between a typo and a
     // spent balance.
-    const needed = estimate(work.length)
+    const needed = estimate(work.length, style.units)
     const credits = await balance()
     if (credits < needed) {
       return Response.json(
         {
           error:
             `Not enough API credit: ${work.length} image${work.length === 1 ? '' : 's'} ` +
-            `needs about ${needed} units at ${UNITS_PER_IMAGE} each, and the balance is ${credits}. ` +
+            `needs about ${needed} units at ${style.units} each in ${style.name}, and the balance is ${credits}. ` +
             'Note this is the prepaid API pool, which is separate from Recraft subscription credits.',
           credits,
           needed,
@@ -85,7 +96,6 @@ export async function POST(request: Request) {
     // One palette for the whole set — the images are meant to belong together.
     // The form previews this same call, so what was shown is what is drawn.
     const palette = paletteFor(brief || work[0], salt, brand, scheme)
-    const { trained, key } = style()
 
     const items: Item[] = []
     let drawn = 0
@@ -99,7 +109,7 @@ export async function POST(request: Request) {
       const prompt = industry ? `${scene}. Industry: ${industry}.` : scene
 
       try {
-        const { data, ext } = await generate(prompt, palette.colors)
+        const { data, ext } = await generate(prompt, palette.colors, style)
 
         if (ext !== 'svg') {
           // A raster answer means the style is not a vector style. Say so
@@ -108,14 +118,14 @@ export async function POST(request: Request) {
             ok: false,
             subject,
             error:
-              `Recraft answered with ${ext.toUpperCase()}, not SVG. The style in use (${key}) is a ` +
+              `Recraft answered with ${ext.toUpperCase()}, not SVG. The style in use (${style.name}) is a ` +
               'raster style — train or select a vector_illustration style to get SVG out.',
           })
           drawn += 1
           continue
         }
 
-        const { svg, width, height, shapes } = normalize(data.toString('utf8'))
+        const { svg, width, height, shapes } = normalize(data.toString('utf8'), style.size)
         items.push({ ok: true, subject, svg, width, height, shapes })
         drawn += 1
       } catch (error) {
@@ -126,8 +136,8 @@ export async function POST(request: Request) {
     return Response.json({
       items,
       palette: { hex: palette.hex, scheme: palette.scheme, base: Math.round(palette.base) },
-      style: { trained, key },
-      spent: { images: drawn, units: drawn * UNITS_PER_IMAGE },
+      style: { key: style.key, name: style.name },
+      spent: { images: drawn, units: drawn * style.units },
     })
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 })
