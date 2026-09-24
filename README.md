@@ -1,4 +1,4 @@
-# Recraft Studio
+# Clear Studio
 
 A small web app that turns a brief into a **set of SVG illustrations**, and a
 written record of what was learned building an illustration pipeline against
