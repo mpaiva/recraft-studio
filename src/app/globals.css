@@ -1,0 +1,107 @@
+/*
+ * One place for colour, so a change is a change here and not a hunt.
+ *
+ * Every value is a custom property on :root and redefined for dark mode. The
+ * repo this was spun out of enforces that with a CI check; this one is small
+ * enough to rely on the convention, but the convention is the same: components
+ * reference tokens, never literals.
+ */
+:root {
+  color-scheme: light dark;
+
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --border: #e3ded6;
+  --text: #1b1a18;
+  --muted: #6b655d;
+  --accent: #7c3aed;
+  --accent-text: #ffffff;
+  --danger: #b3261e;
+  --ok: #1f6b3a;
+
+  --radius: 10px;
+  --gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14130f;
+    --surface: #1d1b17;
+    --border: #322e28;
+    --text: #f2efe9;
+    --muted: #a49c90;
+    --accent: #a78bfa;
+    --accent-text: #1b1a18;
+    --danger: #f2b8b5;
+    --ok: #7ddba3;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: 32px 20px 80px; }
+
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+.lede { color: var(--muted); margin: 0 0 24px; max-width: 62ch; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: var(--gap);
+}
+
+label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
+.hint { font-weight: 400; color: var(--muted); }
+
+textarea, input[type="text"], input[type="number"] {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.row { display: flex; gap: var(--gap); flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1 1 200px; }
+
+button {
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 10px 18px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+
+.meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); }
+.meta strong { color: var(--text); }
+
+.swatches { display: flex; gap: 6px; }
+.swatch { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); }
+
+.grid { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.card figure { margin: 0; background: var(--bg); }
+.card svg { display: block; width: 100%; height: auto; }
+.card .foot { padding: 12px 14px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.card .subject { font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
+
+.error { color: var(--danger); }
+.notice { border-left: 3px solid var(--danger); padding-left: 12px; }
