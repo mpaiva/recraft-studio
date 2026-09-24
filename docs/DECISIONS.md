@@ -51,16 +51,28 @@ keys, redrew six illustrations nobody had asked to change, for real money, and
 **destroyed the only copy of each original.** Nothing in the output said
 "replacing". They scrolled past identically to the new ones.
 
-Two rules came out of it, and they generalise well beyond this tool:
+Two rules came out of it, and they generalize well beyond this tool:
 
 1. **Make replacement opt-in and name it.** A cache key moving is not consent.
 2. **Never overwrite the only copy.** Superseded files get renamed, not
    clobbered. A rename costs nothing and is the difference between changing your
    mind and not being able to.
 
-This app does not persist anything yet, so neither rule has a home in the code
-here — which is precisely why they are written down. The first feature that
-saves a set to disk needs both on day one.
+The first things this app saves to disk are styles made from a description,
+and both rules were in them from day one:
+
+- Every file is created with `wx`, so an existing file makes the write fail
+  rather than be replaced — reference images, samples, and the temporary file
+  behind `data/styles.json`. Each draft of references gets a new directory.
+- `data/styles.json` is only added to. An id already in it is refused, and the
+  file is replaced by renaming a complete new copy over it, never by writing
+  into it.
+- References the person unticks were still paid for, so they stay on disk.
+- The record is written as soon as the style exists, before its sample is
+  drawn, so a failed sample cannot lose the only note of what a paid-for style
+  is.
+
+Sets of drawings are still not saved. When they are, the same rules apply.
 
 ## One palette per set, not per image
 
@@ -78,12 +90,12 @@ to reproduce and a bill impossible to predict.
 
 ## The drawings do not theme, and that is a real cost
 
-The colours are baked into the SVG. The drawing looks the same on a light page
+The colors are baked into the SVG. The drawing looks the same on a light page
 and a dark one, and it sits outside whatever design-token system the host
 application has.
 
 That is the price of letting the model decide how to spend three given hues, and
 it is worth stating out loud rather than discovering later. The alternative —
-stripping colour and recolouring at render time — was tried in the original and
-produces flat, dead shapes, because the model's colour choices carry the
-modelling.
+stripping color and recoloring at render time — was tried in the original and
+produces flat, dead shapes, because the model's color choices carry the
+modeling.

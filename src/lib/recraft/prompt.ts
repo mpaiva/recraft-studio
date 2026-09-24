@@ -5,12 +5,12 @@
  * was added in response to something the model actually did:
  *
  * **"saturated and high in contrast", "nothing muted, nothing washed out"** —
- * colours are passed separately as exact RGB numbers the API honours, so this
+ * colors are passed separately as exact RGB numbers the API honors, so this
  * asks for saturation and deliberately says nothing about hue. A prose clause
- * naming colours here would be a second opinion fighting those numbers.
+ * naming colors here would be a second opinion fighting those numbers.
  *
  * **"No text, no lettering, no numbers"** — generative models put invented
- * words into illustrations constantly, and misspelt fake text in a published
+ * words into illustrations constantly, and misspelled fake text in a published
  * drawing is worse than no drawing.
  *
  * **"fills the whole frame edge to edge. No border, no frame, no vignette"** —
@@ -30,5 +30,3 @@ export const PREAMBLE =
   'No text, no lettering, no numbers. ' +
   'The artwork fills the whole frame edge to edge. No border, no frame, no vignette.'
 
-/** Recraft wants `WIDTHxHEIGHT`. 3:2 landscape. */
-export const SIZE = '1536x1024'

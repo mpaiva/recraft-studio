@@ -1,6 +1,7 @@
 import 'server-only'
 
-import { PREAMBLE, SIZE } from './prompt'
+import { PREAMBLE } from './prompt'
+import type { StyleOption } from './styles'
 
 /**
  * The Recraft API, and the four things about it that cost time to learn.
@@ -11,10 +12,10 @@ import { PREAMBLE, SIZE } from './prompt'
  * 400 on the first image. `balance()` exists so that shows up before a batch
  * rather than eight images into one.
  *
- * **2. A trained style is not the same as a substyle.** `style_id` points at a
- * style trained on reference images and is the difference between a set that
- * shares a look and a set that merely shares a substyle. Without one this falls
- * back to `colored_stencil`, which is a floor, not a substitute.
+ * **2. A style decides the model, the size and the price.** A curated style
+ * goes to Recraft V3; a style id now resolves to Recraft V4 Styles, which
+ * rejects V3's sizes. `styles.ts` holds that mapping, and `generate()` takes
+ * the resolved style rather than guessing.
  *
  * **3. Dropping the substyle entirely is worse than either.** Tried once: with
  * no style and no substyle the model returns a *photograph of an illustration
@@ -47,44 +48,41 @@ export async function balance(): Promise<number> {
   return Number(JSON.parse(await res.text())?.credits ?? 0)
 }
 
-/**
- * The style parameters for a generation.
- *
- * A style id is not a secret and it decides what everything looks like, so it
- * belongs somewhere visible. In the repo this came from it is committed to a
- * JSON file for exactly that reason: held in an ignored file it would be absent
- * on any other machine, and the fallback would quietly draw in a different
- * style rather than fail — the worst kind of difference, because nothing
- * reports it. Here it is an env var, so the fallback announces itself in the
- * response instead.
- */
-export function style(): { key: string; params: Record<string, string>; trained: boolean } {
-  const id = process.env.RECRAFT_STYLE_ID?.trim()
-  return id
-    ? { key: `style_id:${id}`, params: { style_id: id }, trained: true }
-    : {
-        key: 'substyle:colored_stencil',
-        params: { style: 'vector_illustration', substyle: 'colored_stencil' },
-        trained: false,
-      }
+/** A style on this account, as `GET /v1/styles` lists it. No name, no preview. */
+export type AccountStyle = { id: string; style: string; creation_time?: string; is_private?: boolean }
+
+/** The account's own styles. Free to ask. */
+export async function listStyles(): Promise<AccountStyle[]> {
+  const res = await fetch(`${API}/styles`, { headers: { Authorization: `Bearer ${token()}` } })
+  if (!res.ok) throw new Error(`Could not list Recraft styles: ${res.status}`)
+  return (JSON.parse(await res.text())?.styles ?? []) as AccountStyle[]
 }
 
 /**
- * Train a style on reference images and return its id.
+ * Make a style from reference images and return its id. 5 units.
  *
- * `base` must be one of Recraft's own style families. `vector_illustration`
- * keeps the output SVG, which is what this app wants; `digital_illustration`
- * trains on richer references but answers with raster.
+ * References must be PNG, JPG or WebP — not SVG — at most 10 of them. `model`
+ * is the model the style will be used with; it has to match at generation
+ * time, which is why the app creates for `recraftv4_styles_vector` and draws
+ * with the same. `prompt` is stored with the style, so a style made from a
+ * description keeps the description.
  */
-export async function createStyle(
-  files: { name: string; bytes: Uint8Array }[],
-  base = 'vector_illustration',
-): Promise<string> {
+export async function createStyle({
+  files,
+  model,
+  style = 'vector_illustration',
+  prompt,
+}: {
+  files: { name: string; bytes: Uint8Array }[]
+  model: string
+  style?: string
+  prompt?: string
+}): Promise<string> {
   const form = new FormData()
-  form.append('style', base)
-  for (const file of files) {
-    form.append('file', new Blob([file.bytes as BlobPart]), file.name)
-  }
+  form.append('model', model)
+  form.append('style', style)
+  if (prompt) form.append('prompt', prompt)
+  files.forEach((file, i) => form.append(`file${i + 1}`, new Blob([file.bytes as BlobPart]), file.name))
 
   const res = await fetch(`${API}/styles`, {
     method: 'POST',
@@ -97,25 +95,19 @@ export async function createStyle(
   return JSON.parse(body).id
 }
 
-export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' }
+export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' | 'jpg' }
 
 /**
- * One image. `colors` are exact RGB triples the API honours, which is why the
- * preamble says nothing about hue.
+ * One image from a finished request body, with nothing added. Most callers
+ * want `generate()`, which adds the preamble and the colors; this is for the
+ * few that must not — reference images for a new style are drawn from the
+ * person's own description, and the preamble would argue with it.
  */
-export async function generate(
-  subject: string,
-  colors: [number, number, number][],
-): Promise<Generated> {
+export async function draw(request: Record<string, unknown>): Promise<Generated> {
   const res = await fetch(`${API}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-    body: JSON.stringify({
-      prompt: `${PREAMBLE} ${subject}`,
-      size: SIZE,
-      ...style().params,
-      controls: { colors: colors.map((c) => ({ rgb: c })) },
-    }),
+    body: JSON.stringify(request),
   })
 
   const body = await res.text()
@@ -135,7 +127,26 @@ export async function generate(
       ? 'svg'
       : head.toString('utf8', 8, 12) === 'WEBP'
         ? 'webp'
-        : 'png'
+        : head[0] === 0xff && head[1] === 0xd8
+          ? 'jpg'
+          : 'png'
 
   return { data, ext }
+}
+
+/**
+ * One image. `colors` are exact RGB triples the API honors, which is why the
+ * preamble says nothing about hue.
+ */
+export async function generate(
+  subject: string,
+  colors: [number, number, number][],
+  style: StyleOption,
+): Promise<Generated> {
+  return draw({
+    prompt: `${PREAMBLE} ${subject}`,
+    size: style.size,
+    ...style.params,
+    controls: { colors: colors.map((c) => ({ rgb: c })) },
+  })
 }

@@ -1,8 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { optimize } from 'svgo'
 
-import { SIZE } from './prompt'
-
 const SHAPES = 'path, rect, circle, ellipse, polygon, polyline'
 
 /**
@@ -10,17 +8,17 @@ const SHAPES = 'path, rect, circle, ellipse, polygon, polyline'
  *
  * `removeMetadata` is left at its SVGO default, which drops Recraft's C2PA
  * provenance manifest. That is correct here rather than careless: C2PA hashes
- * the bytes it signs, and optimising has already changed them, so carrying the
+ * the bytes it signs, and optimizing has already changed them, so carrying the
  * manifest forward would ship a provenance claim that fails verification.
  *
  * If provenance matters to you, keep the untouched original — this app returns
- * `raw` alongside the optimised markup for exactly that reason.
+ * `raw` alongside the optimized markup for exactly that reason.
  */
 export function shrink(source: string): string {
   return optimize(source, { multipass: true, floatPrecision: 1 }).data
 }
 
-export type Normalised = {
+export type Normalized = {
   /** The markup, ready to inline or serve. */
   svg: string
   width: number
@@ -47,19 +45,20 @@ export type Normalised = {
  * but the same markup written to a `.svg` file does, and it is the same string
  * either way.
  *
- * Note what does *not* happen: the colours are left alone. The drawing carries
+ * Note what does *not* happen: the colors are left alone. The drawing carries
  * its own palette and will look the same on a light page and a dark one. That
  * is a real trade — it means these drawings sit outside any design-token system
  * — and it is the price of letting the model choose how to use the three hues
  * it was given.
  */
-export function normalise(source: string): Normalised {
+/** `size` is what was asked for, `WIDTHxHEIGHT` — used only if the SVG has no viewBox. */
+export function normalize(source: string, size: string): Normalized {
   const dom = new JSDOM(source, { contentType: 'image/svg+xml' })
   const svg = dom.window.document.documentElement
 
   svg.querySelector('metadata')?.remove()
 
-  const viewBox = svg.getAttribute('viewBox') ?? `0 0 ${SIZE.replace('x', ' ')}`
+  const viewBox = svg.getAttribute('viewBox') ?? `0 0 ${size.replace('x', ' ')}`
   const [, , width, height] = viewBox.split(/\s+/).map(Number)
 
   svg.removeAttribute('width')

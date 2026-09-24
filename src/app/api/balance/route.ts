@@ -1,8 +1,7 @@
-import { balance, style } from '@/lib/recraft/client'
-import { UNITS_PER_IMAGE } from '@/lib/recraft/cost'
+import { balance } from '@/lib/recraft/client'
 
 /**
- * What the account can spend, and what it will be spent on.
+ * What the account can spend.
  *
  * Separate from generation on purpose: this is the question you want answered
  * *before* committing to a batch, and it is free to ask. The API balance is a
@@ -12,12 +11,7 @@ import { UNITS_PER_IMAGE } from '@/lib/recraft/cost'
  */
 export async function GET() {
   try {
-    const { trained, key } = style()
-    return Response.json({
-      credits: await balance(),
-      unitsPerImage: UNITS_PER_IMAGE,
-      style: { trained, key },
-    })
+    return Response.json({ credits: await balance() })
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 })
   }

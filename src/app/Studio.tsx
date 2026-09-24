@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import type { Item } from './api/generate/route'
+import { paletteFor, parseHex, SCHEMES, toHex } from '@/lib/palette'
+import { StylePicker, type StyleInfo } from './StylePicker'
+import type { MakeInfo } from './CreateStyle'
 
-type Account = { credits: number; unitsPerImage: number; style: { trained: boolean; key: string } }
+type Account = { credits: number }
 type Result = {
   items: Item[]
   palette: { hex: string[]; scheme: { name: string; reason: string }; base: number }
-  style: { trained: boolean; key: string }
+  style: { key: string; name: string }
   spent: { images: number; units: number }
 }
 
@@ -28,15 +31,25 @@ function slug(subject: string, index: number) {
 
 export function Studio() {
   const [brief, setBrief] = useState('')
+  const [industry, setIndustry] = useState('')
   const [lines, setLines] = useState('')
   const [count, setCount] = useState(3)
   const [salt, setSalt] = useState('')
+  const [brand, setBrand] = useState('')
+  const [scheme, setScheme] = useState('')
 
   const [account, setAccount] = useState<Account | null>(null)
   const [accountError, setAccountError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [styles, setStyles] = useState<StyleInfo[]>([])
+  const [styleKey, setStyleKey] = useState('')
+  const [picking, setPicking] = useState(false)
+  const [make, setMake] = useState<MakeInfo | null>(null)
+  const [styleNote, setStyleNote] = useState('')
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
+  const [improving, setImproving] = useState(false)
+  const [improveError, setImproveError] = useState('')
 
   // Ask what the account can spend before anything is committed to. Free, and
   // the alternative is finding out from a 400 partway through a batch.
@@ -45,12 +58,35 @@ export function Studio() {
       .then((r) => r.json())
       .then((d) => (d.error ? setAccountError(d.error) : setAccount(d)))
       .catch((e) => setAccountError(String(e)))
+    loadStyles()
   }, [])
+
+  function loadStyles(select?: string) {
+    fetch('/api/styles')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) return
+        setStyles(d.styles)
+        setMake(d.make)
+        setStyleKey((k) => select || k || d.defaultKey)
+      })
+      .catch(() => {})
+  }
 
   const subjects = lines.split('\n').map((s) => s.trim()).filter(Boolean)
   const images = Math.min(subjects.length || count, 6)
-  const needed = images * (account?.unitsPerImage ?? 80)
+  // The price is per style — curated and account styles use different models.
+  const style = styles.find((s) => s.key === styleKey)
+  const needed = images * (style?.units ?? 80)
   const affordable = account ? account.credits >= needed : true
+
+  // The same call the server makes, with the same inputs trimmed the same way,
+  // so the swatches here are the colors that will be drawn — seen before
+  // anything is spent rather than after.
+  const brandRgb = parseHex(brand)
+  const brandInvalid = Boolean(brand.trim()) && !brandRgb
+  const seedText = brief.trim() || subjects[0]
+  const preview = seedText ? paletteFor(seedText, salt.trim(), brandRgb ? brand.trim() : '', scheme) : null
 
   async function run() {
     setBusy(true)
@@ -60,7 +96,7 @@ export function Studio() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, subjects, count, salt }),
+        body: JSON.stringify({ brief, industry, subjects, count, salt, brand: brand.trim(), scheme, style: styleKey }),
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? `Request failed: ${res.status}`)
@@ -73,6 +109,27 @@ export function Studio() {
       setError(String(e))
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Rewrites the subjects in place rather than drawing them, so the result is
+  // read and edited before any Recraft units are spent on it.
+  async function improve() {
+    setImproving(true)
+    setImproveError('')
+    try {
+      const res = await fetch('/api/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brief, industry, subjects, count }),
+      })
+      const data = await res.json()
+      if (!res.ok) setImproveError(data.error ?? `Request failed: ${res.status}`)
+      else setLines(data.subjects.join('\n'))
+    } catch (e) {
+      setImproveError(String(e))
+    } finally {
+      setImproving(false)
     }
   }
 
@@ -96,10 +153,9 @@ export function Studio() {
         ) : account ? (
           <div className="meta">
             <span>API credit <strong>{account.credits.toLocaleString()}</strong></span>
-            <span>Per image <strong>{account.unitsPerImage}</strong></span>
+            <span>Per image <strong>{style?.units ?? '…'}</strong></span>
             <span>
-              Style{' '}
-              <strong>{account.style.trained ? 'trained' : 'fallback (colored_stencil)'}</strong>
+              Style <strong>{style?.name ?? '…'}</strong>
             </span>
             <span>This run <strong className={affordable ? '' : 'error'}>{needed}</strong></span>
           </div>
@@ -122,6 +178,19 @@ export function Studio() {
 
         <div style={{ height: 14 }} />
 
+        <label htmlFor="industry">
+          Industry <span className="hint">— optional context for the setting and props</span>
+        </label>
+        <input
+          id="industry"
+          type="text"
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          placeholder="Healthcare, logistics, fintech…"
+        />
+
+        <div style={{ height: 14 }} />
+
         <label htmlFor="lines">
           Subjects <span className="hint">— one per line, or leave empty for variations on the brief</span>
         </label>
@@ -133,34 +202,180 @@ export function Studio() {
           placeholder={'a stand-up call across four time zones\na pull request waiting overnight\nan onboarding checklist'}
         />
 
+        <div style={{ height: 8 }} />
+
+        <button className="ghost" onClick={improve} disabled={improving || busy || (!industry && !brief)}>
+          {improving
+            ? 'Improving…'
+            : subjects.length
+              ? `Improve ${subjects.length === 1 ? 'subject' : 'subjects'} for ${industry || 'the brief'}`
+              : `Suggest ${count} subjects for ${industry || 'the brief'}`}
+        </button>{' '}
+        {improveError ? <span className="error hint">{improveError}</span> : null}
+
         <div style={{ height: 14 }} />
 
-        <div className="row">
-          <div>
-            <label htmlFor="count">
-              How many <span className="hint">— used only when no subjects are listed</span>
-            </label>
-            <input
-              id="count"
-              type="number"
-              min={1}
-              max={6}
-              value={count}
-              disabled={subjects.length > 0}
-              onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-            />
-          </div>
-          <div>
-            <label htmlFor="salt">
-              Palette salt <span className="hint">— change it to reroll the colours</span>
-            </label>
-            <input id="salt" type="text" value={salt} onChange={(e) => setSalt(e.target.value)} placeholder="optional" />
-          </div>
+        <div style={{ maxWidth: 320 }}>
+          <label htmlFor="count">
+            How many <span className="hint">— used only when no subjects are listed</span>
+          </label>
+          <input
+            id="count"
+            type="number"
+            min={1}
+            max={6}
+            value={count}
+            disabled={subjects.length > 0}
+            onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+          />
         </div>
+
+        <section className="group" aria-labelledby="style-label">
+          <label id="style-label">
+            Style <span className="hint">— how every image in the set is drawn</span>
+          </label>
+          <div className="style-current">
+            {style?.sample ? (
+              // eslint-disable-next-line @next/next/no-img-element -- a local SVG; next/image adds nothing here
+              <img src={style.sample} alt="" />
+            ) : (
+              <span className="no-sample" />
+            )}
+            <span className="style-meta">
+              <strong>{style?.name ?? 'Loading styles…'}</strong>
+              {style ? (
+                <span className="hint">
+                  {style.kind === 'curated' ? 'Curated' : 'Yours'} · {style.units} units per image
+                </span>
+              ) : null}
+            </span>
+            <button className="ghost" onClick={() => setPicking(true)} disabled={!styles.length}>
+              Browse styles
+            </button>
+          </div>
+          {styleNote ? <p className="error hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>{styleNote}</p> : null}
+        </section>
+
+        <StylePicker
+          open={picking}
+          styles={styles}
+          selected={styleKey}
+          make={make}
+          onPick={setStyleKey}
+          onCreated={(key, note) => {
+            // A new style has a name and a sample now; fetch the list again and select it.
+            loadStyles(key)
+            setStyleNote(note ?? '')
+            setPicking(false)
+          }}
+          onClose={() => setPicking(false)}
+        />
+
+        {/*
+          Every color decision in one place, in the order they are made: pin it
+          to a brand, choose how the hues sit on the wheel, then see the palette
+          that comes out and reroll it. Nothing here spends anything.
+        */}
+        <section className="group" aria-label="Color">
+          <label htmlFor="brand">
+            Brand color <span className="hint">— optional; the palette is built around it</span>
+          </label>
+          <div className="brand">
+            <input
+              type="color"
+              aria-label="Pick a brand color"
+              value={brandRgb ? toHex([brandRgb])[0] : (preview?.hex[0] ?? '#7c3aed')}
+              onChange={(e) => setBrand(e.target.value)}
+            />
+            <input
+              id="brand"
+              type="text"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="#0f766e"
+            />
+            {brand ? (
+              <button className="ghost" onClick={() => setBrand('')}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+          {brandInvalid ? (
+            <p className="error hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
+              &ldquo;{brand.trim()}&rdquo; is not a hex color like #0f766e.
+            </p>
+          ) : null}
+
+          <div style={{ height: 14 }} />
+
+          <label htmlFor="scheme">
+            Scheme <span className="hint">— how the three hues sit on the wheel</span>
+          </label>
+          <select id="scheme" value={scheme} onChange={(e) => setScheme(e.target.value)}>
+            <option value="">Auto — picked from the brief</option>
+            <optgroup label="High contrast (Auto chooses from these)">
+              {SCHEMES.filter((s) => s.auto).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Chosen only">
+              {SCHEMES.filter((s) => !s.auto).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+
+          <div style={{ height: 14 }} />
+
+          <label>
+            Palette <span className="hint">— shared by every image in the set, and free to change</span>
+          </label>
+
+          {preview ? (
+            <>
+              <div className="meta" style={{ alignItems: 'center' }}>
+                <span className="swatches">
+                  {preview.hex.map((c, i) => (
+                    <span
+                      key={i}
+                      className={`swatch${brandRgb && i === 0 ? ' anchored' : ''}`}
+                      style={{ background: c }}
+                      title={brandRgb && i === 0 ? `${c} (brand)` : c}
+                    />
+                  ))}
+                </span>
+                <span>
+                  {preview.auto ? 'Auto picked ' : 'Scheme '}
+                  <strong>{preview.scheme.name}</strong>
+                </span>
+                <button className="ghost" onClick={() => setSalt((s) => String((Number(s) || 0) + 1))}>
+                  Reroll
+                </button>
+                {salt ? (
+                  <button className="ghost" onClick={() => setSalt('')}>
+                    Back to first
+                  </button>
+                ) : null}
+              </div>
+              <p className="hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
+                {preview.scheme.reason}
+                {brandRgb ? ' The brand color is used exactly; the other two are placed around its hue.' : ''}
+              </p>
+            </>
+          ) : (
+            <p className="hint" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Write a brief or a subject to see the colors.
+            </p>
+          )}
+        </section>
 
         <div style={{ height: 18 }} />
 
-        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable}>
+        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable || brandInvalid || !style}>
           {busy
             ? `Drawing ${images}…`
             : `Draw ${images} illustration${images === 1 ? '' : 's'} · ${needed} units`}
@@ -209,7 +424,7 @@ export function Studio() {
                 {item.ok ? (
                   <>
                     {/*
-                      The markup comes from Recraft, through normalise(), which
+                      The markup comes from Recraft, through normalize(), which
                       strips it to a viewBox and shapes. It is inlined so it
                       scales and themes with the page rather than sitting in an
                       <img> at a fixed size.
