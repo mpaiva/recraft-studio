@@ -1,5 +1,5 @@
 /*
- * One place for colour, so a change is a change here and not a hunt.
+ * One place for color, so a change is a change here and not a hunt.
  *
  * Every value is a custom property on :root and redefined for dark mode. The
  * repo this was spun out of enforces that with a CI check; this one is small

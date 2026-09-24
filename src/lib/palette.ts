@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
 
 /**
- * Three colours for a set, as wheel geometry rather than taste.
+ * Three colors for a set, as wheel geometry rather than taste.
  *
- * **Why colours are numbers and not words.** Two attempts at asking for them in
- * prose both failed, in the same way. "Rich colour" gave thirty-eight drawings
+ * **Why colors are numbers and not words.** Two attempts at asking for them in
+ * prose both failed, in the same way. "Rich color" gave thirty-eight drawings
  * in one blue. Naming the wanted spread — "many different hues, warm and cool
  * together" — gave a set that was red in sixteen and azure in twelve, which is
  * two blues rather than one and not what was asked for either. The cause is not
@@ -13,13 +13,13 @@ import { createHash } from 'node:crypto'
  * preamble only gets a vote.
  *
  * Recraft takes `controls.colors` as RGB triples alongside a custom style and
- * honours them — a probe asking for green, magenta and yellow came back green,
+ * honors them — a probe asking for green, magenta and yellow came back green,
  * magenta and yellow. So the hues are numbers, and the prompt has stopped
  * arguing about them.
  *
  * **Why it is seeded and not random.** `Math.random()` would give a different
  * set every time the same brief was typed, which makes a result impossible to
- * reproduce and a bill impossible to predict. Hashing the brief gives colours
+ * reproduce and a bill impossible to predict. Hashing the brief gives colors
  * that look arbitrary across different briefs and cannot move on their own.
  *
  * **One palette per set, not per image** — and this is the deliberate
@@ -54,7 +54,7 @@ export type Palette = {
 /**
  * Four ways to pick two companions for a hue.
  *
- * Hue is an angle, so the only thing separating two colours on this axis is the
+ * Hue is an angle, so the only thing separating two colors on this axis is the
  * distance between them in degrees — and a scheme is a choice about how to
  * spend 360 of them across three points.
  *
@@ -69,7 +69,7 @@ export type Palette = {
  * the third at 190 so the set is mostly one mood with a single thing arguing.
  *
  * The style supplies the taste. These only have to stop the three from landing
- * on top of each other, which is the failure a random hue per colour would
+ * on top of each other, which is the failure a random hue per color would
  * produce about a third of the time.
  */
 const SCHEMES: Scheme[] = [
@@ -91,13 +91,13 @@ const SCHEMES: Scheme[] = [
   {
     name: 'analogous',
     offsets: [0, 35, 190],
-    reason: 'Two neighbours reading as one family, and a third opposite them to argue with it.',
+    reason: 'Two neighbors reading as one family, and a third opposite them to argue with it.',
   },
 ]
 
 /**
  * HSV in, 0–255 RGB out. Saturation and value are floored on purpose, so a hue
- * reads as a colour rather than as a dark.
+ * reads as a color rather than as a dark.
  */
 export function fromHsv(h: number, s: number, v: number): [number, number, number] {
   const c = v * s
@@ -117,7 +117,7 @@ export function toHex(colors: [number, number, number][]): string[] {
   return colors.map((c) => `#${c.map((n) => n.toString(16).padStart(2, '0')).join('')}`)
 }
 
-/** Three colours from at least 14 bytes of seed. */
+/** Three colors from at least 14 bytes of seed. */
 export function paletteFromBytes(seed: Uint8Array): Palette {
   if (seed.length < 14) throw new Error('paletteFromBytes needs at least 14 bytes of seed')
 

@@ -20,7 +20,7 @@ arbitrary input, at request time, in the browser.
   images look like they belong together. A salt rerolls it.
 - The **cost is shown before anything is spent**, checked against the real API
   balance.
-- Output is **SVG**: normalised, optimised, inlined, and downloadable.
+- Output is **SVG**: normalized, optimized, inlined, and downloadable.
 
 ## Setup
 
@@ -57,10 +57,10 @@ beside a zero here.
 
 ```
 src/lib/recraft/client.ts   the API: balance, styles, generation
-src/lib/recraft/svg.ts      normalise + optimise the SVG that comes back
+src/lib/recraft/svg.ts      normalize + optimize the SVG that comes back
 src/lib/recraft/cost.ts     units per image, and the measurement behind it
 src/lib/recraft/prompt.ts   the preamble, clause by clause
-src/lib/palette.ts          three colours from a seed, as wheel geometry
+src/lib/palette.ts          three colors from a seed, as wheel geometry
 src/lib/improve.ts          rewrite subjects for an industry, via Claude
 src/app/api/balance         what the account can spend
 src/app/api/generate        draw a set
@@ -71,7 +71,7 @@ src/app/Studio.tsx          the UI
 ## Docs
 
 - **[RECRAFT-API.md](docs/RECRAFT-API.md)** — how the API actually behaves:
-  the two balances, units per image, style tiers, colour control, response
+  the two balances, units per image, style tiers, color control, response
   sniffing, C2PA.
 - **[DECISIONS.md](docs/DECISIONS.md)** — why this is shaped the way it is,
   including the runs that died partway through and the six originals that got

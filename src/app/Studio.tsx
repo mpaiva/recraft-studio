@@ -200,7 +200,7 @@ export function Studio() {
           </div>
           <div>
             <label htmlFor="salt">
-              Palette salt <span className="hint">— change it to reroll the colours</span>
+              Palette salt <span className="hint">— change it to reroll the colors</span>
             </label>
             <input id="salt" type="text" value={salt} onChange={(e) => setSalt(e.target.value)} placeholder="optional" />
           </div>
@@ -257,7 +257,7 @@ export function Studio() {
                 {item.ok ? (
                   <>
                     {/*
-                      The markup comes from Recraft, through normalise(), which
+                      The markup comes from Recraft, through normalize(), which
                       strips it to a viewBox and shapes. It is inlined so it
                       scales and themes with the page rather than sitting in an
                       <img> at a fixed size.

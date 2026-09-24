@@ -22,7 +22,7 @@ A good subject is a concrete, visual scene: who or what is in it, what is happen
 
 Make each subject specific to the industry you are given: its people, tools, places, and moments. Avoid clichés (handshakes, lightbulbs, gears, generic office meetings).
 
-Do not restate the brief or name the industry; both are added separately. Keep each subject to one line of at most 15 words. Make the subjects in a set distinct from one another.`
+Do not restate the brief or name the industry; both are added separately. Keep each subject to one line of at most 15 words. Make the subjects in a set distinct from one another. Write in American English (operating room, not operating theatre; color, not colour).`
 
 const MAX_SET = 6
 

@@ -1,6 +1,6 @@
 import { balance, generate, style } from '@/lib/recraft/client'
 import { estimate, UNITS_PER_IMAGE } from '@/lib/recraft/cost'
-import { normalise } from '@/lib/recraft/svg'
+import { normalize } from '@/lib/recraft/svg'
 import { paletteFor } from '@/lib/palette'
 
 /** Every image is real money. A typo in a loop should not be able to spend it all. */
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
           continue
         }
 
-        const { svg, width, height, shapes } = normalise(data.toString('utf8'))
+        const { svg, width, height, shapes } = normalize(data.toString('utf8'))
         items.push({ ok: true, subject, svg, width, height, shapes })
         drawn += 1
       } catch (error) {

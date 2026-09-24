@@ -60,19 +60,19 @@ difference, because nothing reports it.
 a vector style all the way down — a raster style with a vector request still
 returns raster.
 
-## Colours: pass numbers, not adjectives
+## Colors: pass numbers, not adjectives
 
-`controls.colors` takes RGB triples and **the model honours them**. A probe
+`controls.colors` takes RGB triples and **the model honors them**. A probe
 asking for green, magenta and yellow came back green, magenta and yellow.
 
 Asking in prose does not work, and fails in a specific way worth knowing. "Rich
-colour" produced thirty-eight drawings in one blue. Naming the wanted spread —
+color" produced thirty-eight drawings in one blue. Naming the wanted spread —
 "many different hues, warm and cool together" — produced sixteen reds and twelve
 azures, which is two blues rather than one, and not what was asked for either.
 
 The cause is not weak wording. A trained style is built from reference images,
 and **images beat a sentence**: whatever the references were made of is what
-comes back, and the prompt only gets a vote. So specify colour as numbers and
+comes back, and the prompt only gets a vote. So specify color as numbers and
 let the prompt ask for things the references cannot decide — saturation,
 contrast, framing.
 
@@ -93,12 +93,12 @@ files containing PNG, which fails much later and confusingly.
 Each of these was added in response to something the model actually did:
 
 - **"No text, no lettering, no numbers"** — models put invented words into
-  illustrations constantly, and misspelt fake text is worse than no drawing.
+  illustrations constantly, and misspelled fake text is worse than no drawing.
 - **"fills the whole frame edge to edge. No border, no frame, no vignette"** —
   without it, a meaningful share come back matted, as if photographed hanging in
   a gallery.
 - **"saturated and high in contrast, nothing muted, nothing washed out"** —
-  works *with* the numeric colours rather than against them, because it asks
+  works *with* the numeric colors rather than against them, because it asks
   about saturation and says nothing about hue.
 
 And one worth removing: a set of light negatives ("no sparks, no glare, no
@@ -108,10 +108,10 @@ that style was replaced the negatives stayed for a while, fighting a look they
 were never aimed at. **Prompt clauses should be deleted when the thing they
 defended against is gone.**
 
-## C2PA provenance does not survive optimisation
+## C2PA provenance does not survive optimization
 
 Recraft embeds a C2PA manifest in a `<metadata>` element. C2PA hashes the bytes
-it signs, so the moment you run SVGO — or recolour, or reformat — the manifest
+it signs, so the moment you run SVGO — or recolor, or reformat — the manifest
 describes bytes that no longer exist and verification fails.
 
 Dropping it is therefore correct rather than careless. But keep the untouched

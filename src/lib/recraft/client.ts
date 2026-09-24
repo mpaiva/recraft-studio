@@ -100,7 +100,7 @@ export async function createStyle(
 export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' }
 
 /**
- * One image. `colors` are exact RGB triples the API honours, which is why the
+ * One image. `colors` are exact RGB triples the API honors, which is why the
  * preamble says nothing about hue.
  */
 export async function generate(

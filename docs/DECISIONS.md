@@ -51,7 +51,7 @@ keys, redrew six illustrations nobody had asked to change, for real money, and
 **destroyed the only copy of each original.** Nothing in the output said
 "replacing". They scrolled past identically to the new ones.
 
-Two rules came out of it, and they generalise well beyond this tool:
+Two rules came out of it, and they generalize well beyond this tool:
 
 1. **Make replacement opt-in and name it.** A cache key moving is not consent.
 2. **Never overwrite the only copy.** Superseded files get renamed, not
@@ -78,12 +78,12 @@ to reproduce and a bill impossible to predict.
 
 ## The drawings do not theme, and that is a real cost
 
-The colours are baked into the SVG. The drawing looks the same on a light page
+The colors are baked into the SVG. The drawing looks the same on a light page
 and a dark one, and it sits outside whatever design-token system the host
 application has.
 
 That is the price of letting the model decide how to spend three given hues, and
 it is worth stating out loud rather than discovering later. The alternative —
-stripping colour and recolouring at render time — was tried in the original and
-produces flat, dead shapes, because the model's colour choices carry the
-modelling.
+stripping color and recoloring at render time — was tried in the original and
+produces flat, dead shapes, because the model's color choices carry the
+modeling.
