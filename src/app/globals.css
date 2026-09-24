@@ -170,3 +170,14 @@ button.ghost { background: transparent; color: var(--text); border-color: var(--
   background: repeating-linear-gradient(45deg, var(--surface) 0 8px, var(--bg) 8px 16px);
 }
 .style-card .style-meta { padding: 0 2px 2px; }
+
+.group-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.group-head button { font-size: 0.85rem; padding: 6px 12px; }
+.style-description { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+
+/* Making a style: the same dialog, a form instead of a grid. */
+.picker-body.create { padding-top: 4px; }
+.create-cost { font-size: 0.85rem; margin: 12px 0; max-width: 70ch; }
+.create-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.style-card.ref { cursor: pointer; }
+.style-card.ref input { accent-color: var(--accent); }

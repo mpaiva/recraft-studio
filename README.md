@@ -14,6 +14,9 @@ arbitrary input, at request time, in the browser.
 - A **brief** sets the direction the whole set shares.
 - A **style** is picked from a browser of every style available: Recraft's
   curated vector library and the account's own, each with a sample drawing.
+  A new style can be **made from a written description**: Recraft draws the
+  description a few times, you keep the drawings that fit, and those become the
+  style (about 160 units with three references).
 - An optional **industry** is added to every prompt as context for the setting
   and props.
 - **Subjects**, one per line, become one illustration each — or leave them empty
@@ -77,6 +80,8 @@ src/lib/recraft/client.ts   the API: balance, styles, generation
 src/lib/recraft/svg.ts      normalize + optimize the SVG that comes back
 src/lib/recraft/cost.ts     units per image, per model, and the measurements
 src/lib/recraft/styles.ts   every style: its model, size, price and sample
+src/lib/recraft/make-style.ts  a style from a description, in two paid steps
+src/lib/recraft/registry.ts names and descriptions of styles made here
 src/lib/recraft/prompt.ts   the preamble, clause by clause
 src/lib/palette.ts          three colors from a seed, as wheel geometry
 src/lib/improve.ts          rewrite subjects for an industry, via Claude
@@ -85,6 +90,7 @@ src/app/api/generate        draw a set
 src/app/api/improve         rewrite the subjects (Claude, no Recraft units)
 src/app/api/styles          every style the form can pick
 src/app/StylePicker.tsx     the style browser
+src/app/CreateStyle.tsx     describe a style, check its references, make it
 scripts/samples.ts          draw one sample per style, for the browser
 src/app/Studio.tsx          the UI
 ```
@@ -101,5 +107,8 @@ src/app/Studio.tsx          the UI
 ## Status
 
 Early. It generates and downloads sets; it does not persist them, and there is
-no auth on the generate or improve routes. Read the last section of `DECISIONS.md` before
+no auth on any route — including the ones that make styles and write files.
+Styles made here are saved to `data/styles.json` (names and descriptions, which
+Recraft does not store) and `public/style-references/` (what they were made
+from). Read the last section of `DECISIONS.md` before
 adding either — the rules about replacing files were paid for once already.

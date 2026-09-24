@@ -17,6 +17,11 @@
  * - `recraftv3_vector` (curated styles, and the old substyle fallback): **80**
  * - `recraftv4_styles_vector` (styles from the account): **50**
  *
+ * Making a style adds two more, measured on the first style made here
+ * (2026-09-24, balance read between steps): **35** per `recraftv4_1` raster
+ * image — the references — and **5** to create the style. Both match
+ * Recraft's pricing page.
+ *
  * A wrong constant is worse than no constant. The first version of this check
  * let a run die at twenty-seven while printing a reassuring number, which is a
  * worse failure than not checking at all.
@@ -25,6 +30,8 @@ export const UNITS = {
   raster: 40,
   recraftv3_vector: 80,
   recraftv4_styles_vector: 50,
+  recraftv4_1: 35,
+  createStyle: 5,
 } as const
 
 export function estimate(count: number, unitsPerImage: number): number {

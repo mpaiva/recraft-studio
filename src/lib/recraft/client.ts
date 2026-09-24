@@ -59,21 +59,30 @@ export async function listStyles(): Promise<AccountStyle[]> {
 }
 
 /**
- * Train a style on reference images and return its id.
+ * Make a style from reference images and return its id. 5 units.
  *
- * `base` must be one of Recraft's own style families. `vector_illustration`
- * keeps the output SVG, which is what this app wants; `digital_illustration`
- * trains on richer references but answers with raster.
+ * References must be PNG, JPG or WebP — not SVG — at most 10 of them. `model`
+ * is the model the style will be used with; it has to match at generation
+ * time, which is why the app creates for `recraftv4_styles_vector` and draws
+ * with the same. `prompt` is stored with the style, so a style made from a
+ * description keeps the description.
  */
-export async function createStyle(
-  files: { name: string; bytes: Uint8Array }[],
-  base = 'vector_illustration',
-): Promise<string> {
+export async function createStyle({
+  files,
+  model,
+  style = 'vector_illustration',
+  prompt,
+}: {
+  files: { name: string; bytes: Uint8Array }[]
+  model: string
+  style?: string
+  prompt?: string
+}): Promise<string> {
   const form = new FormData()
-  form.append('style', base)
-  for (const file of files) {
-    form.append('file', new Blob([file.bytes as BlobPart]), file.name)
-  }
+  form.append('model', model)
+  form.append('style', style)
+  if (prompt) form.append('prompt', prompt)
+  files.forEach((file, i) => form.append(`file${i + 1}`, new Blob([file.bytes as BlobPart]), file.name))
 
   const res = await fetch(`${API}/styles`, {
     method: 'POST',
@@ -86,26 +95,19 @@ export async function createStyle(
   return JSON.parse(body).id
 }
 
-export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' }
+export type Generated = { data: Buffer; ext: 'svg' | 'webp' | 'png' | 'jpg' }
 
 /**
- * One image. `colors` are exact RGB triples the API honors, which is why the
- * preamble says nothing about hue.
+ * One image from a finished request body, with nothing added. Most callers
+ * want `generate()`, which adds the preamble and the colors; this is for the
+ * few that must not — reference images for a new style are drawn from the
+ * person's own description, and the preamble would argue with it.
  */
-export async function generate(
-  subject: string,
-  colors: [number, number, number][],
-  style: StyleOption,
-): Promise<Generated> {
+export async function draw(request: Record<string, unknown>): Promise<Generated> {
   const res = await fetch(`${API}/images/generations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-    body: JSON.stringify({
-      prompt: `${PREAMBLE} ${subject}`,
-      size: style.size,
-      ...style.params,
-      controls: { colors: colors.map((c) => ({ rgb: c })) },
-    }),
+    body: JSON.stringify(request),
   })
 
   const body = await res.text()
@@ -125,7 +127,26 @@ export async function generate(
       ? 'svg'
       : head.toString('utf8', 8, 12) === 'WEBP'
         ? 'webp'
-        : 'png'
+        : head[0] === 0xff && head[1] === 0xd8
+          ? 'jpg'
+          : 'png'
 
   return { data, ext }
+}
+
+/**
+ * One image. `colors` are exact RGB triples the API honors, which is why the
+ * preamble says nothing about hue.
+ */
+export async function generate(
+  subject: string,
+  colors: [number, number, number][],
+  style: StyleOption,
+): Promise<Generated> {
+  return draw({
+    prompt: `${PREAMBLE} ${subject}`,
+    size: style.size,
+    ...style.params,
+    controls: { colors: colors.map((c) => ({ rgb: c })) },
+  })
 }

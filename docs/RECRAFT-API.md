@@ -51,7 +51,15 @@ Three tiers, and the gap between them is large:
    all.
 
 `POST /styles` takes `multipart/form-data`: a `style` field naming the base
-family, plus one `file` part per reference image. It returns `{ id }`.
+family, a `model` the style is for, an optional `prompt` stored with it, and
+one file part per reference image (any field name). It returns `{ id }` and
+costs 5 units. References must be **PNG, JPG or WebP — not SVG**, at most ten.
+
+A style can be made from references drawn by Recraft itself. Tested
+2026-09-24: three `recraftv4_1` raster images drawn from a written description
+(35 units each), made into a style with `model: recraftv4_styles_vector`, then
+drawn with that same model — SVG out, and recognizably the described look. The
+model given at creation must match the one used to draw.
 
 **The style id is not a secret and it decides what everything looks like.** Keep
 it somewhere visible and shared — committed config, not an ignored `.env`. Held

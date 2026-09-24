@@ -1,10 +1,12 @@
 import 'server-only'
 
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { listStyles } from './client'
+import { generate, listStyles } from './client'
 import { UNITS } from './cost'
+import { readRegistry } from './registry'
+import { normalize } from './svg'
 
 /**
  * Every style the app can draw in, and what each one needs on the wire.
@@ -23,6 +25,9 @@ import { UNITS } from './cost'
  * units. The listing does not say which model a style was created for; this
  * assumes V4, which is the API's default for styles created there.
  *
+ * **Styles made here** are account styles like any other, with a name and a
+ * description from `data/styles.json`, since Recraft stores neither.
+ *
  * **Raster styles are listed but not drawable.** The app's whole output is SVG,
  * and a `digital_illustration` style answers in pixels. They stay in the list
  * with the reason, so a style that seems to be missing is explained rather
@@ -34,6 +39,8 @@ export type StyleOption = {
   key: string
   kind: 'curated' | 'custom'
   name: string
+  /** What the style was described as, for styles made from a description. */
+  description?: string
   /** Generation parameters: model plus style or style_id. */
   params: Record<string, string>
   size: string
@@ -74,7 +81,7 @@ export const CURATED = [
 ]
 
 const V3 = { model: 'recraftv3_vector', size: '1536x1024', units: UNITS.recraftv3_vector }
-const V4 = { model: 'recraftv4_styles_vector', size: '1280x832', units: UNITS.recraftv4_styles_vector }
+export const V4 = { model: 'recraftv4_styles_vector', size: '1280x832', units: UNITS.recraftv4_styles_vector }
 
 /** The style used when nobody has chosen one: the old substyle fallback, by its curated name. */
 export const FALLBACK_KEY = 'curated:Colored stencil'
@@ -103,11 +110,13 @@ function curated(name: string): StyleOption {
   })
 }
 
-function custom(id: string, family: string, created?: string): StyleOption {
+export function custom(id: string, family: string, created?: string): StyleOption {
+  const record = readRegistry()[id]
   return withSample({
     key: `custom:${id}`,
     kind: 'custom',
-    name: `Your style ${id.slice(0, 8)}`,
+    name: record?.name ?? `Your style ${id.slice(0, 8)}`,
+    description: record?.description,
     params: { model: V4.model, style_id: id },
     size: V4.size,
     units: V4.units,
@@ -117,6 +126,29 @@ function custom(id: string, family: string, created?: string): StyleOption {
         ? undefined
         : `A ${family} style answers in raster, and this app only returns SVG.`,
   })
+}
+
+/**
+ * The sample every style is drawn with: one subject, one palette, so the only
+ * thing that differs between two samples is the style.
+ */
+export const SAMPLE_SUBJECT = 'A lighthouse keeper climbing a spiral staircase at dusk'
+export const SAMPLE_COLORS: [number, number, number][] = [
+  [48, 136, 105],
+  [49, 152, 196],
+  [164, 55, 95],
+]
+
+/**
+ * Draw a style's sample and save it. Never replaces one: the file is opened
+ * with `wx`, so an existing sample makes this throw instead.
+ */
+export async function drawSample(style: StyleOption): Promise<'saved' | string> {
+  const { data, ext } = await generate(SAMPLE_SUBJECT, SAMPLE_COLORS, style)
+  if (ext !== 'svg') return `answered ${ext}, not SVG — nothing saved`
+  const { svg } = normalize(data.toString('utf8'), style.size)
+  writeFileSync(path.join(SAMPLE_DIR, sampleFile(style.key)), svg, { flag: 'wx' })
+  return 'saved'
 }
 
 /**

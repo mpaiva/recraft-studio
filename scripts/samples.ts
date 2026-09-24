@@ -19,19 +19,8 @@
  * Every sample uses the same subject and palette, so the only thing that
  * differs between two of them is the style.
  */
-import { writeFileSync } from 'node:fs'
-import path from 'node:path'
-
-import { balance, generate } from '../src/lib/recraft/client'
-import { allStyles, SAMPLE_DIR, sampleFile } from '../src/lib/recraft/styles'
-import { normalize } from '../src/lib/recraft/svg'
-
-const SUBJECT = 'A lighthouse keeper climbing a spiral staircase at dusk'
-const COLORS: [number, number, number][] = [
-  [48, 136, 105],
-  [49, 152, 196],
-  [164, 55, 95],
-]
+import { balance } from '../src/lib/recraft/client'
+import { allStyles, drawSample, sampleFile } from '../src/lib/recraft/styles'
 
 async function main() {
   const styles = await allStyles()
@@ -55,14 +44,8 @@ async function main() {
   for (const [n, style] of todo.entries()) {
     const label = `[${n + 1}/${todo.length}] ${style.name}`
     try {
-      const { data, ext } = await generate(SUBJECT, COLORS, style)
-      if (ext !== 'svg') {
-        console.log(`${label}: answered ${ext}, not SVG — nothing saved`)
-      } else {
-        const { svg } = normalize(data.toString('utf8'), style.size)
-        writeFileSync(path.join(SAMPLE_DIR, sampleFile(style.key)), svg, { flag: 'wx' })
-        console.log(`${label}: saved ${sampleFile(style.key)}`)
-      }
+      const outcome = await drawSample(style)
+      console.log(`${label}: ${outcome === 'saved' ? `saved ${sampleFile(style.key)}` : outcome}`)
       spent += style.units
     } catch (error) {
       console.log(`${label}: FAILED — ${(error as Error).message}`)

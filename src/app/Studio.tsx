@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { Item } from './api/generate/route'
 import { paletteFor, parseHex, SCHEMES, toHex } from '@/lib/palette'
 import { StylePicker, type StyleInfo } from './StylePicker'
+import type { MakeInfo } from './CreateStyle'
 
 type Account = { credits: number }
 type Result = {
@@ -43,6 +44,8 @@ export function Studio() {
   const [styles, setStyles] = useState<StyleInfo[]>([])
   const [styleKey, setStyleKey] = useState('')
   const [picking, setPicking] = useState(false)
+  const [make, setMake] = useState<MakeInfo | null>(null)
+  const [styleNote, setStyleNote] = useState('')
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [improving, setImproving] = useState(false)
@@ -55,15 +58,20 @@ export function Studio() {
       .then((r) => r.json())
       .then((d) => (d.error ? setAccountError(d.error) : setAccount(d)))
       .catch((e) => setAccountError(String(e)))
+    loadStyles()
+  }, [])
+
+  function loadStyles(select?: string) {
     fetch('/api/styles')
       .then((r) => r.json())
       .then((d) => {
         if (d.error) return
         setStyles(d.styles)
-        setStyleKey((k) => k || d.defaultKey)
+        setMake(d.make)
+        setStyleKey((k) => select || k || d.defaultKey)
       })
       .catch(() => {})
-  }, [])
+  }
 
   const subjects = lines.split('\n').map((s) => s.trim()).filter(Boolean)
   const images = Math.min(subjects.length || count, 6)
@@ -245,13 +253,21 @@ export function Studio() {
               Browse styles
             </button>
           </div>
+          {styleNote ? <p className="error hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>{styleNote}</p> : null}
         </section>
 
         <StylePicker
           open={picking}
           styles={styles}
           selected={styleKey}
+          make={make}
           onPick={setStyleKey}
+          onCreated={(key, note) => {
+            // A new style has a name and a sample now; fetch the list again and select it.
+            loadStyles(key)
+            setStyleNote(note ?? '')
+            setPicking(false)
+          }}
           onClose={() => setPicking(false)}
         />
 

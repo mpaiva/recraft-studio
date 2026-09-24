@@ -58,9 +58,21 @@ Two rules came out of it, and they generalize well beyond this tool:
    clobbered. A rename costs nothing and is the difference between changing your
    mind and not being able to.
 
-This app does not persist anything yet, so neither rule has a home in the code
-here — which is precisely why they are written down. The first feature that
-saves a set to disk needs both on day one.
+The first things this app saves to disk are styles made from a description,
+and both rules were in them from day one:
+
+- Every file is created with `wx`, so an existing file makes the write fail
+  rather than be replaced — reference images, samples, and the temporary file
+  behind `data/styles.json`. Each draft of references gets a new directory.
+- `data/styles.json` is only added to. An id already in it is refused, and the
+  file is replaced by renaming a complete new copy over it, never by writing
+  into it.
+- References the person unticks were still paid for, so they stay on disk.
+- The record is written as soon as the style exists, before its sample is
+  drawn, so a failed sample cannot lose the only note of what a paid-for style
+  is.
+
+Sets of drawings are still not saved. When they are, the same rules apply.
 
 ## One palette per set, not per image
 
