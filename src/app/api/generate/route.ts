@@ -12,6 +12,21 @@ export type Item =
   | { ok: false; subject: string; error: string }
 
 /**
+ * What the response streams, one JSON object per line: `start` once, an
+ * `item` as each image finishes, then `done`. Errors found before anything is
+ * spent are an ordinary JSON response with a status instead.
+ */
+export type SetEvent =
+  | {
+      type: 'start'
+      subjects: string[]
+      style: { key: string; name: string; size: string; units: number }
+      palette: { hex: string[]; scheme: { name: string; reason: string }; base: number }
+    }
+  | { type: 'item'; index: number; item: Item }
+  | { type: 'done'; spent: { images: number; units: number } }
+
+/**
  * Draw a set.
  *
  * Three decisions here are about money rather than code, and each one exists
@@ -33,6 +48,12 @@ export type Item =
  * **A partial set is returned, not thrown away.** The response carries per-item
  * results, so four good drawings and one 429 gives you four drawings and a
  * message — not an error page and a bill for five.
+ *
+ * **Each image is sent the moment it exists.** A set of six takes minutes; the
+ * response streams, so the stage fills in as drawings arrive rather than all
+ * at once at the end. And if the person leaves — closes the tab, reloads — the
+ * stream is cancelled and nothing more is drawn, so no one pays for images no
+ * one will see.
  */
 export async function POST(request: Request) {
   try {
@@ -97,47 +118,74 @@ export async function POST(request: Request) {
     // The form previews this same call, so what was shown is what is drawn.
     const palette = paletteFor(brief || work[0], salt, brand, scheme)
 
-    const items: Item[] = []
-    let drawn = 0
+    const encoder = new TextEncoder()
+    let cancelled = false
 
-    for (const subject of work) {
-      // Prefix the shared brief when the subjects are individual lines, so every
-      // image in the set still carries the same direction.
-      // The industry goes last, as context rather than as the subject: it should
-      // steer the props and setting without taking over what is being drawn.
-      const scene = subjects.length && brief ? `${brief} ${subject}` : subject
-      const prompt = industry ? `${scene}. Industry: ${industry}.` : scene
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: SetEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
 
-      try {
-        const { data, ext } = await generate(prompt, palette.colors, style)
+        send({
+          type: 'start',
+          subjects: work,
+          style: { key: style.key, name: style.name, size: style.size, units: style.units },
+          palette: { hex: palette.hex, scheme: palette.scheme, base: Math.round(palette.base) },
+        })
 
-        if (ext !== 'svg') {
-          // A raster answer means the style is not a vector style. Say so
-          // rather than returning something the caller cannot use as SVG.
-          items.push({
-            ok: false,
-            subject,
-            error:
-              `Recraft answered with ${ext.toUpperCase()}, not SVG. The style in use (${style.name}) is a ` +
-              'raster style — train or select a vector_illustration style to get SVG out.',
-          })
-          drawn += 1
-          continue
+        let drawn = 0
+        for (const [index, subject] of work.entries()) {
+          if (cancelled) break
+
+          // Prefix the shared brief when the subjects are individual lines, so every
+          // image in the set still carries the same direction.
+          // The industry goes last, as context rather than as the subject: it should
+          // steer the props and setting without taking over what is being drawn.
+          const scene = subjects.length && brief ? `${brief} ${subject}` : subject
+          const prompt = industry ? `${scene}. Industry: ${industry}.` : scene
+
+          let item: Item
+          try {
+            const { data, ext } = await generate(prompt, palette.colors, style)
+            drawn += 1
+            if (ext !== 'svg') {
+              // A raster answer means the style is not a vector style. Say so
+              // rather than returning something the caller cannot use as SVG.
+              item = {
+                ok: false,
+                subject,
+                error:
+                  `Recraft answered with ${ext.toUpperCase()}, not SVG. The style in use (${style.name}) is a ` +
+                  'raster style — train or select a vector_illustration style to get SVG out.',
+              }
+            } else {
+              const { svg, width, height, shapes } = normalize(data.toString('utf8'), style.size)
+              item = { ok: true, subject, svg, width, height, shapes }
+            }
+          } catch (error) {
+            item = { ok: false, subject, error: (error as Error).message }
+          }
+
+          if (cancelled) break
+          send({ type: 'item', index, item })
         }
 
-        const { svg, width, height, shapes } = normalize(data.toString('utf8'), style.size)
-        items.push({ ok: true, subject, svg, width, height, shapes })
-        drawn += 1
-      } catch (error) {
-        items.push({ ok: false, subject, error: (error as Error).message })
-      }
-    }
+        if (!cancelled) {
+          send({ type: 'done', spent: { images: drawn, units: drawn * style.units } })
+          controller.close()
+        }
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
 
-    return Response.json({
-      items,
-      palette: { hex: palette.hex, scheme: palette.scheme, base: Math.round(palette.base) },
-      style: { key: style.key, name: style.name },
-      spent: { images: drawn, units: drawn * style.units },
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        // Proxies buffer by default, which would turn a stream back into one late answer.
+        'X-Accel-Buffering': 'no',
+      },
     })
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 })
