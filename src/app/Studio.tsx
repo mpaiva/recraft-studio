@@ -185,7 +185,7 @@ export function Studio() {
     <div className="app">
       <aside className="sidebar" aria-label="What to draw">
         <header className="sidebar-head">
-          <h1>Recraft Studio</h1>
+          <h1>Clear Studio</h1>
           {account ? (
             <span className="hint" title="Prepaid API credit — separate from Recraft subscription credits">
               {account.credits.toLocaleString()} credit
