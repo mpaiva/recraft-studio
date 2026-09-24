@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Item } from './api/generate/route'
+import { paletteFor, parseHex, SCHEMES, toHex } from '@/lib/palette'
 
 type Account = { credits: number; unitsPerImage: number; style: { trained: boolean; key: string } }
 type Result = {
@@ -32,6 +33,8 @@ export function Studio() {
   const [lines, setLines] = useState('')
   const [count, setCount] = useState(3)
   const [salt, setSalt] = useState('')
+  const [brand, setBrand] = useState('')
+  const [scheme, setScheme] = useState('')
 
   const [account, setAccount] = useState<Account | null>(null)
   const [accountError, setAccountError] = useState('')
@@ -55,6 +58,14 @@ export function Studio() {
   const needed = images * (account?.unitsPerImage ?? 80)
   const affordable = account ? account.credits >= needed : true
 
+  // The same call the server makes, with the same inputs trimmed the same way,
+  // so the swatches here are the colors that will be drawn — seen before
+  // anything is spent rather than after.
+  const brandRgb = parseHex(brand)
+  const brandInvalid = Boolean(brand.trim()) && !brandRgb
+  const seedText = brief.trim() || subjects[0]
+  const preview = seedText ? paletteFor(seedText, salt.trim(), brandRgb ? brand.trim() : '', scheme) : null
+
   async function run() {
     setBusy(true)
     setError('')
@@ -63,7 +74,7 @@ export function Studio() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief, industry, subjects, count, salt }),
+        body: JSON.stringify({ brief, industry, subjects, count, salt, brand: brand.trim(), scheme }),
       })
       const data = await res.json()
       if (!res.ok) setError(data.error ?? `Request failed: ${res.status}`)
@@ -183,32 +194,126 @@ export function Studio() {
 
         <div style={{ height: 14 }} />
 
-        <div className="row">
-          <div>
-            <label htmlFor="count">
-              How many <span className="hint">— used only when no subjects are listed</span>
-            </label>
-            <input
-              id="count"
-              type="number"
-              min={1}
-              max={6}
-              value={count}
-              disabled={subjects.length > 0}
-              onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
-            />
-          </div>
-          <div>
-            <label htmlFor="salt">
-              Palette salt <span className="hint">— change it to reroll the colors</span>
-            </label>
-            <input id="salt" type="text" value={salt} onChange={(e) => setSalt(e.target.value)} placeholder="optional" />
-          </div>
+        <div style={{ maxWidth: 320 }}>
+          <label htmlFor="count">
+            How many <span className="hint">— used only when no subjects are listed</span>
+          </label>
+          <input
+            id="count"
+            type="number"
+            min={1}
+            max={6}
+            value={count}
+            disabled={subjects.length > 0}
+            onChange={(e) => setCount(Math.max(1, Math.min(6, Number(e.target.value) || 1)))}
+          />
         </div>
+
+        {/*
+          Every color decision in one place, in the order they are made: pin it
+          to a brand, choose how the hues sit on the wheel, then see the palette
+          that comes out and reroll it. Nothing here spends anything.
+        */}
+        <section className="group" aria-label="Color">
+          <label htmlFor="brand">
+            Brand color <span className="hint">— optional; the palette is built around it</span>
+          </label>
+          <div className="brand">
+            <input
+              type="color"
+              aria-label="Pick a brand color"
+              value={brandRgb ? toHex([brandRgb])[0] : (preview?.hex[0] ?? '#7c3aed')}
+              onChange={(e) => setBrand(e.target.value)}
+            />
+            <input
+              id="brand"
+              type="text"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="#0f766e"
+            />
+            {brand ? (
+              <button className="ghost" onClick={() => setBrand('')}>
+                Clear
+              </button>
+            ) : null}
+          </div>
+          {brandInvalid ? (
+            <p className="error hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
+              &ldquo;{brand.trim()}&rdquo; is not a hex color like #0f766e.
+            </p>
+          ) : null}
+
+          <div style={{ height: 14 }} />
+
+          <label htmlFor="scheme">
+            Scheme <span className="hint">— how the three hues sit on the wheel</span>
+          </label>
+          <select id="scheme" value={scheme} onChange={(e) => setScheme(e.target.value)}>
+            <option value="">Auto — picked from the brief</option>
+            <optgroup label="High contrast (Auto chooses from these)">
+              {SCHEMES.filter((s) => s.auto).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Chosen only">
+              {SCHEMES.filter((s) => !s.auto).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+
+          <div style={{ height: 14 }} />
+
+          <label>
+            Palette <span className="hint">— shared by every image in the set, and free to change</span>
+          </label>
+
+          {preview ? (
+            <>
+              <div className="meta" style={{ alignItems: 'center' }}>
+                <span className="swatches">
+                  {preview.hex.map((c, i) => (
+                    <span
+                      key={i}
+                      className={`swatch${brandRgb && i === 0 ? ' anchored' : ''}`}
+                      style={{ background: c }}
+                      title={brandRgb && i === 0 ? `${c} (brand)` : c}
+                    />
+                  ))}
+                </span>
+                <span>
+                  {preview.auto ? 'Auto picked ' : 'Scheme '}
+                  <strong>{preview.scheme.name}</strong>
+                </span>
+                <button className="ghost" onClick={() => setSalt((s) => String((Number(s) || 0) + 1))}>
+                  Reroll
+                </button>
+                {salt ? (
+                  <button className="ghost" onClick={() => setSalt('')}>
+                    Back to first
+                  </button>
+                ) : null}
+              </div>
+              <p className="hint" style={{ margin: '8px 0 0', fontSize: '0.85rem' }}>
+                {preview.scheme.reason}
+                {brandRgb ? ' The brand color is used exactly; the other two are placed around its hue.' : ''}
+              </p>
+            </>
+          ) : (
+            <p className="hint" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Write a brief or a subject to see the colors.
+            </p>
+          )}
+        </section>
 
         <div style={{ height: 18 }} />
 
-        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable}>
+        <button onClick={run} disabled={busy || (!brief && !subjects.length) || !affordable || brandInvalid}>
           {busy
             ? `Drawing ${images}…`
             : `Draw ${images} illustration${images === 1 ? '' : 's'} · ${needed} units`}

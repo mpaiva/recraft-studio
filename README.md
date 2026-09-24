@@ -17,7 +17,11 @@ arbitrary input, at request time, in the browser.
 - **Subjects**, one per line, become one illustration each — or leave them empty
   and get variations on the brief.
 - One **palette** is derived from the brief and shared across the set, so the
-  images look like they belong together. A salt rerolls it.
+  images look like they belong together. It is shown live, before anything is
+  spent; **Reroll** moves it, a **scheme** (triad, complementary, analogous,
+  monochromatic and more, or Auto) decides how its hues sit on the wheel, and an
+  optional **brand color** anchors it — used exactly, with the other two placed
+  around its hue.
 - The **cost is shown before anything is spent**, checked against the real API
   balance.
 - Output is **SVG**: normalized, optimized, inlined, and downloadable.

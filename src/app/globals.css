@@ -63,7 +63,7 @@ h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
 label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; }
 .hint { font-weight: 400; color: var(--muted); }
 
-textarea, input[type="text"], input[type="number"] {
+textarea, select, input[type="text"], input[type="number"] {
   width: 100%;
   font: inherit;
   color: inherit;
@@ -105,3 +105,21 @@ button.ghost { background: transparent; color: var(--text); border-color: var(--
 
 .error { color: var(--danger); }
 .notice { border-left: 3px solid var(--danger); padding-left: 12px; }
+
+/* A labeled block inside a panel, set off by a rule rather than another box. */
+.group { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+
+.brand { display: flex; gap: 8px; align-items: stretch; }
+.brand button { flex: 0 0 auto; }
+.brand input[type="color"] {
+  flex: 0 0 46px;
+  height: auto;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+/* The brand swatch is the one color the palette does not choose. */
+.swatch.anchored { outline: 2px solid var(--text); outline-offset: 2px; }
+

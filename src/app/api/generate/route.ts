@@ -1,7 +1,7 @@
 import { balance, generate, style } from '@/lib/recraft/client'
 import { estimate, UNITS_PER_IMAGE } from '@/lib/recraft/cost'
 import { normalize } from '@/lib/recraft/svg'
-import { paletteFor } from '@/lib/palette'
+import { paletteFor, parseHex, schemeById } from '@/lib/palette'
 
 /** Every image is real money. A typo in a loop should not be able to spend it all. */
 const MAX_SET = 6
@@ -39,6 +39,8 @@ export async function POST(request: Request) {
     const brief: string = (body?.brief ?? '').trim()
     const salt: string = (body?.salt ?? '').trim()
     const industry: string = (body?.industry ?? '').trim()
+    const brand: string = (body?.brand ?? '').trim()
+    const scheme: string = (body?.scheme ?? '').trim()
 
     const subjects: string[] = Array.isArray(body?.subjects)
       ? body.subjects.map((s: unknown) => String(s).trim()).filter(Boolean)
@@ -46,6 +48,15 @@ export async function POST(request: Request) {
 
     if (!brief && !subjects.length) {
       return Response.json({ error: 'Give it a brief, or one subject per line.' }, { status: 400 })
+    }
+
+    // Refuse rather than drop it: a brand color that silently fell back to a
+    // hashed hue would draw a whole set off-brand and bill for it.
+    if (brand && !parseHex(brand)) {
+      return Response.json({ error: `Brand color "${brand}" is not a hex color like #0f766e.` }, { status: 400 })
+    }
+    if (scheme && !schemeById(scheme)) {
+      return Response.json({ error: `Unknown color scheme "${scheme}".` }, { status: 400 })
     }
 
     // No subjects means "variations on the brief": the same request N times,
@@ -72,7 +83,8 @@ export async function POST(request: Request) {
     }
 
     // One palette for the whole set — the images are meant to belong together.
-    const palette = paletteFor(brief || work[0], salt)
+    // The form previews this same call, so what was shown is what is drawn.
+    const palette = paletteFor(brief || work[0], salt, brand, scheme)
     const { trained, key } = style()
 
     const items: Item[] = []
