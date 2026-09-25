@@ -72,7 +72,11 @@ and both rules were in them from day one:
   drawn, so a failed sample cannot lose the only note of what a paid-for style
   is.
 
-Sets of drawings are still not saved. When they are, the same rules apply.
+Sets of drawings are still not saved. The Illustration Studio's library is the
+first place drawings are, and it keeps both rules: new documents are created
+with `wx`, a replaced document is moved to `data/studio-library/.attic/`
+before its successor is renamed into place, and delete is a move to the same
+attic.
 
 ## One palette per set, not per image
 

@@ -1,5 +1,6 @@
-import { CREATE_UNITS, isDraft, makeStyle, MAX_REFS, REF_UNITS } from '@/lib/recraft/make-style'
-import { allStyles, defaultKey } from '@/lib/recraft/styles'
+import { CREATE_UNITS, isDraft, makeStyle, MAX_REFS, MAX_TOTAL, MAX_UPLOAD_BYTES, REF_UNITS } from '@/lib/recraft/make-style'
+import { allStyles, defaultKey, rasterStyles } from '@/lib/recraft/styles'
+import { listExamples } from '@/lib/studio/examples'
 
 /**
  * Every style the picker can show: Recraft's curated vector library, then the
@@ -9,18 +10,21 @@ import { allStyles, defaultKey } from '@/lib/recraft/styles'
  * style is called, what it costs, whether it can be used, and what it looks
  * like.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const styles = (await allStyles()).map((style) => {
+    // `?format=raster`: the Illustration Studio's raster styles. Without it, the vector list, as before.
+    const raster = new URL(request.url).searchParams.get('format') === 'raster'
+    const styles = (raster ? rasterStyles() : await allStyles()).map((style) => {
       const { params, ...rest } = style
       void params
-      return rest
+      // Drawings beyond the sample, for the Illustration Studio's style browser.
+      return { ...rest, examples: listExamples(style.key) }
     })
     return Response.json({
       styles,
-      defaultKey: defaultKey(),
+      defaultKey: raster ? 'raster:Illustration' : defaultKey(),
       // What making a style costs, so the form can show it before anything is spent.
-      make: { refUnits: REF_UNITS, createUnits: CREATE_UNITS, maxRefs: MAX_REFS },
+      make: { refUnits: REF_UNITS, createUnits: CREATE_UNITS, maxRefs: MAX_REFS, maxTotal: MAX_TOTAL, maxUploadBytes: MAX_UPLOAD_BYTES },
     })
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 })

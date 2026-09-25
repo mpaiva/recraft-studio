@@ -51,6 +51,14 @@ export type StyleOption = {
   created?: string
   /** Public URL of the sample drawing, if one has been drawn. */
   sample?: string
+  /** Public URLs of the images a style made here was built from. */
+  references?: string[]
+  /** Made from the Illustration Studio's library (see api/studio/library-style). */
+  library?: boolean
+  /** What it draws. Everything but the Studio's raster styles is vector. */
+  format?: 'vector' | 'raster'
+  /** For raster styles: Recraft's own grouping, photographic or illustration. */
+  group?: 'Photo' | 'Illustration'
 }
 
 /** Recraft V3 vector styles, as listed in the API docs. Order is theirs. */
@@ -80,8 +88,31 @@ export const CURATED = [
   'Seamless Vector',
 ]
 
+/**
+ * Recraft V3 raster styles, for the Illustration Studio's raster output, as
+ * listed in the API docs (2026-09-24). Sent by display name like the vector
+ * ones, with `model: 'recraftv3'`, the same sizes and the same color controls.
+ * 40 units an image (the raster measurement in cost.ts). Kept out of
+ * `allStyles()`, which Clear Studio's picker reads and which only draws SVG.
+ */
+export const RASTER_CURATED: { name: string; group: 'Photo' | 'Illustration' }[] = [
+  ...['Photorealism', 'Enterprise', 'Natural light', 'Studio photo', 'HDR', 'Hard flash', 'Motion blur', 'Black & white',
+    'Evening light', 'Faded Nostalgia', 'Forest life', 'Mystic Naturalism', 'Natural Tones', 'Organic Calm', 'Real-Life Glow',
+    'Retro Realism', 'Retro Snapshot', 'Urban Drama', 'Village Realism', 'Warm Folk', 'Product photo'].map((name) => ({ name, group: 'Photo' as const })),
+  ...['Illustration', 'Hand-drawn', 'Grain', 'Bold Sketch', 'Pencil sketch', 'Retro Pop', 'Clay', 'Risograph', 'Color engraving',
+    'Pixel art', 'Antiquarian', 'Bold fantasy', 'Child book', 'Cover', 'Crosshatch', 'Digital engraving', 'Expressionism',
+    'Freehand details', 'Grain 2.0', 'Graphic intensity', 'Hard Comics', 'Long shadow', 'Modern Folk', 'Multicolor', 'Neon Calm',
+    'Noir', 'Nostalgic pastel', 'Outline details', 'Pastel gradient', 'Pastel sketch', 'Pop art', 'Pop renaissance', 'Street art',
+    'Tablet sketch', 'Urban Glow', 'Urban sketching', 'Young adult book', 'Young adult book 2', 'Seamless Digital'].map((name) => ({ name, group: 'Illustration' as const })),
+]
+
 const V3 = { model: 'recraftv3_vector', size: '1536x1024', units: UNITS.recraftv3_vector }
 export const V4 = { model: 'recraftv4_styles_vector', size: '1280x832', units: UNITS.recraftv4_styles_vector }
+/**
+ * Raster styles made here (the Studio's raster library style): created and drawn with `recraftv4_styles`,
+ * base style `any`. The size is V4 Styles' 3:2, as for vector — assumed, and a 400 would say otherwise for free.
+ */
+export const V4_RASTER = { model: 'recraftv4_styles', style: 'any', size: '1280x832', units: UNITS.recraftv4_styles_raster }
 
 /** The style used when nobody has chosen one: the old substyle fallback, by its curated name. */
 export const FALLBACK_KEY = 'curated:Colored stencil'
@@ -90,8 +121,9 @@ export const FALLBACK_KEY = 'curated:Colored stencil'
 export const SAMPLE_DIR = path.join(process.cwd(), 'public', 'style-samples')
 
 export function sampleFile(key: string): string {
-  const slug = key.replace(/^curated:/, '').replace(/^custom:/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  return `${key.startsWith('custom:') ? 'custom-' : ''}${slug}.svg`
+  const slug = key.replace(/^(curated|custom|raster):/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  // Raster styles share names with nothing vector, but are kept apart anyway; their samples are images.
+  return key.startsWith('raster:') ? `raster-${slug}.webp` : `${key.startsWith('custom:') ? 'custom-' : ''}${slug}.svg`
 }
 
 function withSample(style: StyleOption): StyleOption {
@@ -110,13 +142,58 @@ function curated(name: string): StyleOption {
   })
 }
 
+function raster(entry: { name: string; group: 'Photo' | 'Illustration' }): StyleOption {
+  return withSample({
+    key: `raster:${entry.name}`,
+    kind: 'curated',
+    format: 'raster',
+    group: entry.group,
+    name: entry.name,
+    params: { model: 'recraftv3', style: entry.name },
+    size: V3.size,
+    units: UNITS.raster,
+  })
+}
+
+/**
+ * The Illustration Studio's raster styles: Recraft's curated ones, then raster styles recorded in the
+ * registry — shared styles picked by id, not the library's own (the Studio shows those as "Your library").
+ * Listing them is free.
+ */
+export function rasterStyles(): StyleOption[] {
+  const recorded = Object.entries(readRegistry())
+    .filter(([, r]) => r.format === 'raster' && !r.library)
+    .map(([id]) => custom(id, 'any'))
+  return [...RASTER_CURATED.map(raster), ...recorded]
+}
+
 export function custom(id: string, family: string, created?: string): StyleOption {
   const record = readRegistry()[id]
+  // Only a raster style this app recorded is drawable as raster: for the rest, the model is unknown. A
+  // recorded model (a shared V3 style) overrides V4 Styles, with V3's size and price.
+  if (record?.format === 'raster') {
+    const v3 = record.model === 'recraftv3'
+    return withSample({
+      key: `custom:${id}`,
+      kind: 'custom',
+      format: 'raster',
+      name: record.name,
+      description: record.description,
+      references: record.references,
+      library: record.library,
+      params: { model: record.model ?? V4_RASTER.model, style_id: id },
+      size: v3 ? V3.size : V4_RASTER.size,
+      units: v3 ? UNITS.raster : V4_RASTER.units,
+      created: created ?? record.created,
+    })
+  }
   return withSample({
     key: `custom:${id}`,
     kind: 'custom',
     name: record?.name ?? `Your style ${id.slice(0, 8)}`,
     description: record?.description,
+    references: record?.references,
+    library: record?.library,
     params: { model: V4.model, style_id: id },
     size: V4.size,
     units: V4.units,
@@ -164,7 +241,8 @@ export function defaultKey(): string {
 export async function allStyles(): Promise<StyleOption[]> {
   const mine = await listStyles()
   const envId = process.env.RECRAFT_STYLE_ID?.trim()
-  const listed = mine.map((s) => custom(s.id, s.style, s.creation_time))
+  // Raster styles made here are drawn only by the Studio's raster output; this list is the vector one.
+  const listed = mine.map((s) => custom(s.id, s.style, s.creation_time)).filter((s) => s.format !== 'raster')
   // A style shared to this account, or set by id, may not be in its own listing.
   if (envId && !listed.some((s) => s.key === `custom:${envId}`)) listed.unshift(custom(envId, 'vector_illustration'))
   return [...CURATED.map(curated), ...listed]
@@ -183,9 +261,18 @@ export async function resolveStyle(key: string): Promise<StyleOption> {
     if (!CURATED.includes(name)) throw new Error(`Unknown curated style "${name}".`)
     return curated(name)
   }
+  if (key.startsWith('raster:')) {
+    const entry = RASTER_CURATED.find((r) => r.name === key.slice('raster:'.length))
+    if (!entry) throw new Error(`Unknown raster style "${key.slice('raster:'.length)}".`)
+    return raster(entry)
+  }
   if (key.startsWith('custom:')) {
-    const found = (await allStyles()).find((s) => s.key === key)
-    if (!found) throw new Error(`Style ${key.slice('custom:'.length)} is not on this Recraft account.`)
+    const id = key.slice('custom:'.length)
+    // The account listing can lag a style made seconds ago; one this app recorded making is trusted.
+    const record = readRegistry()[id]
+    if (record?.format === 'raster') return custom(id, 'any')
+    const found = (await allStyles()).find((s) => s.key === key) ?? (record ? custom(id, 'vector_illustration') : undefined)
+    if (!found) throw new Error(`Style ${id} is not on this Recraft account.`)
     if (found.disabled) throw new Error(found.disabled)
     return found
   }

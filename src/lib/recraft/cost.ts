@@ -22,6 +22,15 @@
  * image — the references — and **5** to create the style. Both match
  * Recraft's pricing page.
  *
+ * A raster style from this account (`recraftv4_styles` with a `style_id`, which
+ * is what the Illustration Studio's raster library style is) is **35** per
+ * Recraft's pricing page (2026-09-24) — not yet measured here.
+ *
+ * Vectorizing an image is **10**: Recraft's pricing page says so, and the
+ * first real run (2026-09-24, a 384×256 PNG) moved the balance by 10.
+ * `/api/studio/vectorize` still reads the balance before and after each one and
+ * reports the difference, in case it ever stops matching.
+ *
  * A wrong constant is worse than no constant. The first version of this check
  * let a run die at twenty-seven while printing a reassuring number, which is a
  * worse failure than not checking at all.
@@ -32,6 +41,8 @@ export const UNITS = {
   recraftv4_styles_vector: 50,
   recraftv4_1: 35,
   createStyle: 5,
+  recraftv4_styles_raster: 35,
+  vectorize: 10,
 } as const
 
 export function estimate(count: number, unitsPerImage: number): number {

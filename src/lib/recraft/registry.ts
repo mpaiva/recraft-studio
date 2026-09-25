@@ -25,6 +25,17 @@ export type StyleRecord = {
   created: string
   /** Public paths of the reference images the style was made from. */
   references: string[]
+  /** Made by the Illustration Studio from its library; superseded when the library changes. */
+  library?: boolean
+  /** A raster style (`recraftv4_styles`, base style `any`). Everything else recorded here is vector. */
+  format?: 'vector' | 'raster'
+  /**
+   * The model to draw with, for a style this app didn't make: a shared (public) Recraft style picked by
+   * id. A style_id sent without a model resolves to V4 Styles, which is wrong for a V3 style.
+   */
+  model?: string
+  /** Where a shared style was found, for a person to go and look at it. */
+  source?: string
 }
 
 const FILE = path.join(process.cwd(), 'data', 'styles.json')
