@@ -29,6 +29,12 @@ import { custom, drawSample, V4 } from './styles'
  * "expressive painterly marks", which would argue with whatever the person
  * described — and the references are the style, so the argument would win.
  *
+ * **The person's own images can join them.** Up to `MAX_TOTAL` images in all
+ * (Recraft's limit for one style), uploaded alongside the drawn references or
+ * instead of them. Uploads are free, so a draft made only from uploads skips
+ * the paid drawing step. They are saved into the same draft as `own-N.<ext>`,
+ * after their bytes are checked to really be PNG, JPG or WebP.
+ *
  * Nothing is overwritten and nothing paid for is thrown away. Each draft gets
  * a new directory, files are written with `wx`, and references the person
  * does not keep stay on disk.
@@ -48,14 +54,28 @@ const REF_SCENES = [
 ]
 export const MAX_REFS = REF_SCENES.length
 
+/** Recraft's limit on the images one style is made from (`createStyle`). */
+export const MAX_TOTAL = 10
+/** Per uploaded image. The Studio scales larger pictures down before sending them. */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
 const REF_ROOT = path.join(process.cwd(), 'public', 'style-references')
 const DRAFT = /^[a-z0-9]+-[a-f0-9]{6}$/
 
 /** A draft id this app could have made — anything else, including a path, is refused. */
 export const isDraft = (draft: string) => DRAFT.test(draft)
-const REF_FILE = /^ref-\d\.(png|jpg|webp)$/
+const REF_FILE = /^(ref|own)-\d{1,2}\.(png|jpg|webp)$/
 
-export type Reference = { file: string; url: string } | { error: string }
+export type Reference = { file: string; url: string; own?: true } | { error: string }
+
+/** What an upload really is, from its first bytes — not from its name or the type the browser claimed. */
+export function sniff(bytes: Uint8Array): 'png' | 'jpg' | 'webp' | null {
+  const b = Buffer.from(bytes.subarray(0, 12))
+  if (b.length >= 8 && b.readUInt32BE(0) === 0x89504e47) return 'png'
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg'
+  if (b.length >= 12 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') return 'webp'
+  return null
+}
 
 async function preflight(needed: number) {
   const credits = await balance()
@@ -64,18 +84,35 @@ async function preflight(needed: number) {
   }
 }
 
-/** Step 1: draw references for a description. Returns the draft they are in. */
-export async function drawReferences(description: string, count: number) {
-  const n = Math.max(1, Math.min(MAX_REFS, Math.floor(count)))
-  await preflight(n * REF_UNITS)
+/**
+ * Step 1: draw references for a description, alongside any images the person
+ * uploaded. Returns the draft they are all in.
+ */
+export async function drawReferences(description: string, count: number, uploads: Uint8Array[] = []) {
+  const n = Math.max(0, Math.min(MAX_REFS, Math.floor(count)))
+  if (!n && !uploads.length) throw new Error('Draw at least one reference, or add your own images.')
+  if (n + uploads.length > MAX_TOTAL) throw new Error(`A style is made from at most ${MAX_TOTAL} images.`)
+  // Checked before anything is spent, so a bad upload cannot waste a drawing.
+  const kinds = uploads.map((bytes, i) => {
+    const kind = sniff(bytes)
+    if (!kind) throw new Error(`Image ${i + 1} is not a PNG, JPG or WebP.`)
+    if (bytes.length > MAX_UPLOAD_BYTES) throw new Error(`Image ${i + 1} is over ${MAX_UPLOAD_BYTES / 1024 / 1024} MB.`)
+    return kind
+  })
+  if (n) await preflight(n * REF_UNITS)
 
   const draft = `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`
   const dir = path.join(REF_ROOT, draft)
   mkdirSync(REF_ROOT, { recursive: true })
   mkdirSync(dir) // not recursive: throws if the draft somehow exists, rather than writing into it
 
+  const references: Reference[] = uploads.map((bytes, i) => {
+    const file = `own-${i + 1}.${kinds[i]}`
+    writeFileSync(path.join(dir, file), bytes, { flag: 'wx' })
+    return { file, url: `/style-references/${draft}/${file}`, own: true }
+  })
+
   // One at a time, like everything else that spends: a failure costs what it drew.
-  const references: Reference[] = []
   let spent = 0
   for (const [i, scene] of REF_SCENES.slice(0, n).entries()) {
     try {
@@ -136,5 +173,8 @@ export async function makeStyle(input: { draft: string; files: string[]; name: s
     sample = (error as Error).message
   }
 
-  return { key: style.key, sample }
+  // What a picker needs to show it right away, with the sample if it was drawn. No wire parameters.
+  const { params, ...info } = custom(id, 'vector_illustration')
+  void params
+  return { key: style.key, sample, style: info }
 }

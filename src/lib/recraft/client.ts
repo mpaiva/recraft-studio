@@ -72,16 +72,20 @@ export async function createStyle({
   model,
   style = 'vector_illustration',
   prompt,
+  match,
 }: {
   files: { name: string; bytes: Uint8Array }[]
   model: string
   style?: string
   prompt?: string
+  /** How closely drawings follow the references: V4 takes `flexible` (Recraft's default) or `precise`. */
+  match?: 'flexible' | 'precise'
 }): Promise<string> {
   const form = new FormData()
   form.append('model', model)
   form.append('style', style)
   if (prompt) form.append('prompt', prompt)
+  if (match) form.append('match', match)
   files.forEach((file, i) => form.append(`file${i + 1}`, new Blob([file.bytes as BlobPart]), file.name))
 
   const res = await fetch(`${API}/styles`, {
@@ -132,6 +136,30 @@ export async function draw(request: Record<string, unknown>): Promise<Generated>
           : 'png'
 
   return { data, ext }
+}
+
+/**
+ * Trace a raster image into vector. PNG, JPG or WebP, at most 10 MB, 16 MP and
+ * 4096 px on the long side, at least 256 px on the short side — Recraft's
+ * limits, which a 400 enforces for free. Answers with an SVG.
+ */
+export async function vectorize(file: { name: string; bytes: Uint8Array }): Promise<Generated> {
+  const form = new FormData()
+  form.append('file', new Blob([file.bytes as BlobPart]), file.name)
+  const res = await fetch(`${API}/images/vectorize`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token()}` },
+    body: form,
+  })
+  const body = await res.text()
+  if (!res.ok) throw new Error(`Recraft ${res.status}: ${body.slice(0, 400)}`)
+  const url = JSON.parse(body)?.image?.url
+  if (!url) throw new Error(`No image url in response: ${body.slice(0, 400)}`)
+  const out = await fetch(url)
+  if (!out.ok) throw new Error(`Download failed: ${out.status}`)
+  const data = Buffer.from(await out.arrayBuffer())
+  const head = data.toString('utf8', 0, 256).trimStart()
+  return { data, ext: head.startsWith('<?xml') || head.startsWith('<svg') ? 'svg' : 'png' }
 }
 
 /**

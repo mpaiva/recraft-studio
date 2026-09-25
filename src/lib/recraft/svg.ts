@@ -69,3 +69,92 @@ export function normalize(source: string, size: string): Normalized {
 
   return { svg: shrink(svg.outerHTML), width, height, shapes }
 }
+
+export type Artwork = {
+  viewBox: string
+  /** The drawing's children, without the outer `<svg>`, for a host to wrap and lay out. */
+  markup: string
+  shapes: number
+  /** Whether a full-frame background was taken out. */
+  cleared: boolean
+}
+
+/**
+ * A drawing for the Illustration Studio, which places artwork inside its own
+ * container, surface and safe zone rather than showing it edge to edge.
+ *
+ * **The full-frame background goes.** Every Recraft vector answer starts with a
+ * path covering the whole viewBox (`M0 0h2048v1365H0z`). Left in, it paints the
+ * container's surface a color the host did not choose — wrong on a dark
+ * surface — and makes the Studio's visual-weight check read 100%. Only a first
+ * shape that exactly covers the frame is removed; large shapes that merely
+ * happen to be big are part of the drawing and stay — and only when it is the
+ * color that was asked for (`background`) or near white. Some styles draw
+ * light lines over a dark frame (Engraving is white on black), and taking that
+ * frame away would leave white lines on a white card.
+ */
+export function artwork(source: string, size: string, background?: [number, number, number]): Artwork {
+  const { svg } = normalize(source, size)
+  const dom = new JSDOM(svg, { contentType: 'image/svg+xml' })
+  const root = dom.window.document.documentElement
+  const viewBox = root.getAttribute('viewBox') ?? `0 0 ${size.replace('x', ' ')}`
+  const [, , w, h] = viewBox.split(/\s+/).map(Number)
+
+  const first = Array.from(root.children).find((el) => el.tagName !== 'defs')
+  const covers =
+    !!first &&
+    ((first.tagName === 'path' && fullFrame(first.getAttribute('d') ?? '', w, h)) ||
+      (first.tagName === 'rect' &&
+        Number(first.getAttribute('x') ?? 0) <= 0 &&
+        Number(first.getAttribute('y') ?? 0) <= 0 &&
+        Number(first.getAttribute('width')) >= w &&
+        Number(first.getAttribute('height')) >= h))
+  const cleared = covers && plain(first.getAttribute('fill') ?? '#000', background)
+  if (cleared) first.remove()
+
+  return { viewBox, markup: root.innerHTML, shapes: root.querySelectorAll(SHAPES).length, cleared }
+}
+
+/**
+ * `M0 0h2048v1365H0z` or `M0 0v1365h2048V0z`: a rectangle from the origin
+ * covering the frame. Both spellings come back, depending on the style.
+ */
+function fullFrame(d: string, w: number, h: number): boolean {
+  const s = d.replace(/,/g, ' ').replace(/\s+/g, '').trim()
+  const across = s.match(/^M00h([\d.]+)v([\d.]+)H0[zZ]$/)
+  if (across) return Number(across[1]) >= w && Number(across[2]) >= h
+  const down = s.match(/^M00v([\d.]+)h([\d.]+)V0[zZ]$/)
+  return !!down && Number(down[2]) >= w && Number(down[1]) >= h
+}
+
+/** A fill that is the requested background, or close to white. */
+function plain(fill: string, background?: [number, number, number]): boolean {
+  const hex = fill.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)?.[1]
+  if (!hex) return /^white$/i.test(fill.trim())
+  const full = hex.length === 3 ? hex.replace(/./g, (c) => c + c) : hex
+  const rgb = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16))
+  if (rgb.every((c) => c >= 235)) return true
+  return !!background && Math.hypot(...rgb.map((c, i) => c - background[i])) < 40
+}
+
+/**
+ * An SVG a person uploaded, with everything that runs or loads taken out:
+ * scripts, event handlers, foreign HTML, and links or images that point off
+ * the file. Drawing is left alone. The Studio shows these through <img>, where
+ * none of it could run anyway; this is for the file they download and the
+ * copy that lands in the library.
+ */
+export function inert(source: string): string {
+  const dom = new JSDOM(source, { contentType: 'image/svg+xml' })
+  const doc = dom.window.document
+  if (doc.documentElement.tagName.toLowerCase() !== 'svg') throw new Error('That file is not an SVG.')
+  doc.querySelectorAll('script, foreignObject, iframe, object, embed').forEach((el) => el.remove())
+  doc.querySelectorAll('*').forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase()
+      const external = (name === 'href' || name === 'xlink:href') && !attr.value.trim().startsWith('#')
+      if (name.startsWith('on') || external) el.removeAttribute(attr.name)
+    }
+  })
+  return doc.documentElement.outerHTML
+}

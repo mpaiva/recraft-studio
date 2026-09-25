@@ -16,7 +16,9 @@ arbitrary input, at request time, in the browser.
   curated vector library and the account's own, each with a sample drawing.
   A new style can be **made from a written description**: Recraft draws the
   description a few times, you keep the drawings that fit, and those become the
-  style (about 160 units with three references).
+  style (about 160 units with three references). Your own images can join
+  them — up to ten in all, free to add — or replace the drawn ones entirely, so
+  a style made only from your images costs just the 55 to make it.
 - An optional **industry** is added to every prompt as context for the setting
   and props.
 - **Subjects**, one per line, become one illustration each — or leave them empty
@@ -30,6 +32,18 @@ arbitrary input, at request time, in the browser.
 - The **cost is shown before anything is spent**, checked against the real API
   balance.
 - Output is **SVG**: normalized, optimized, inlined, and downloadable.
+
+## The Illustration Studio
+
+This server is also the generator for the ClearCo Illustration Studio, whose
+front end lives in the sibling `illustration` repo. `/studio` serves that
+folder as-is (set `ILLUSTRATION_APP_DIR` if it lives elsewhere), and the
+Studio's Recraft output draws through `/api/studio/generate`. That route takes
+the Studio's own prompts and seed colors instead of this app's preamble, and
+follows the same money rules: preflight, one image at a time, partial results
+kept, stop on disconnect. Claude writes the Studio's concepts through
+`/api/studio/sample` when `ANTHROPIC_API_KEY` is set, and its approved library
+is kept in `data/studio-library/`. See the `illustration` README.
 
 ## Setup
 
@@ -89,6 +103,9 @@ src/app/api/balance         what the account can spend
 src/app/api/generate        draw a set, streamed as each image finishes
 src/app/api/improve         rewrite the subjects (Claude, no Recraft units)
 src/app/api/styles          every style the form can pick
+src/app/api/studio/*        the Illustration Studio: generate, examples, vectorize, library-style, sample, library, health
+src/app/studio              serves the Studio's front end from ../illustration/app
+src/lib/studio/             the Studio's library and style examples on disk, and its Claude calls
 src/app/StylePicker.tsx     the style browser
 src/app/CreateStyle.tsx     describe a style, check its references, make it
 scripts/samples.ts          draw one sample per style, for the browser
@@ -109,6 +126,13 @@ src/app/Stage.tsx           where sets land, one drawing at a time
 
 Early. It generates and downloads sets; it does not persist them, and there is
 no auth on any route — including the ones that make styles and write files.
+Raster drawings for the Studio (its Recraft V3 raster styles, listed by
+`/api/styles?format=raster` and never by the plain listing Clear Studio reads)
+are copied into `public/studio-rasters/`, one new file each.
+Style examples drawn for the Studio's style browser are saved to
+`public/style-examples/<style>/`, numbered and never replaced. The Illustration
+Studio's approved drawings are saved to
+`data/studio-library/`, with anything replaced or deleted moved to `.attic/`.
 Styles made here are saved to `data/styles.json` (names and descriptions, which
 Recraft does not store) and `public/style-references/` (what they were made
 from). Read the last section of `DECISIONS.md` before

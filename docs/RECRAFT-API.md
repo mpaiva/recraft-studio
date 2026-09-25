@@ -82,6 +82,20 @@ for, so this is the assumption, and it held for the one vector style tested.
 
 A rejected request costs nothing, so a 400 is a cheap way to learn a rule.
 
+### Raster styles from references: `recraftv4_styles` and `any`
+
+Per the API docs (2026-09-24): for V4 models the raster base style is `any`
+(`digital_illustration` and `realistic_image` are V2/V3 only), and the default
+creation model is `recraftv4_styles`. The Illustration Studio makes its raster
+library style that way and draws with `model: recraftv4_styles` and the
+`style_id`, at `1280x832` — assumed from V4 Styles vector, not yet drawn. 35
+units an image on the pricing page.
+
+The docs also describe `style_references` on `POST /images/generations`: up to
+ten PNG/JPG/WebP images attached to the drawing itself, for raster and vector,
+defaulting to `recraftv4_styles`. Untried here. If it works as written, it would
+let the Studio send its library with each drawing instead of making a style.
+
 ### Base family decides raster vs vector
 
 `digital_illustration` trains on richer references but answers with raster.
@@ -136,6 +150,16 @@ image of electrical discharge, which turned every workbench into welding. When
 that style was replaced the negatives stayed for a while, fighting a look they
 were never aimed at. **Prompt clauses should be deleted when the thing they
 defended against is gone.**
+
+## Vectorize is its own endpoint, and cheap
+
+`POST /images/vectorize` takes a multipart `file` (PNG, JPG or WebP; at most
+10 MB, 16 MP and 4096 px on the long side, at least 256 px on the short side)
+and answers `{ image: { url } }` pointing at an SVG. 10 units, per the pricing
+page and the balance on the first run (2026-09-24). A too-small image is a 400
+(`invalid_image_format`, "min image dimension should be no less than 256"),
+which costs nothing. The Illustration Studio scales images into range before
+sending them, and never sends one that is already SVG.
 
 ## C2PA provenance does not survive optimization
 
